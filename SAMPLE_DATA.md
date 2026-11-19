@@ -22,6 +22,20 @@ Map Photos/
 
 The ⚙️ panel has a slider for photo size on the plan.
 
+## Markup: notes, arrows, revision clouds
+
+Three tools under the region tools. Click the tool, then use the plan:
+
+- **Text note**: click, type, Ctrl+Enter.
+- **Arrow**: drag from tail to point.
+- **Revision cloud**: drag a rectangle.
+
+They are listed under **Markup** (Edit a note, Delete, Clear all), are saved in the project JSON (`annotations[]`), and are drawn into the downloaded PDF.
+
+## Sample project
+
+`sample-project/` holds a Hollywood Bowl plan, a project JSON with regions and markup, and a `photos/` folder for your own pictures. Step-by-step instructions are in `sample-project/README.md`.
+
 ## Downloading the photos
 
 **🖼️ Download photos (n)** saves every photo you have placed on the plan, renamed by where it sits:

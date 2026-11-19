@@ -43,6 +43,12 @@
     }
   ],
 
+  "annotations": [
+    { "id": 1, "type": "note", "x": 100, "y": 80, "text": "Check this entrance" },
+    { "id": 2, "type": "arrow", "x1": 200, "y1": 150, "x2": 330, "y2": 420 },
+    { "id": 3, "type": "cloud", "x": 1200, "y": 300, "width": 450, "height": 420 }
+  ],
+
   "import_batches": [
     { "batch": 1, "imported_at": "2026-11-18T20:10:00.000Z", "source": "folder", "photo_count": 2 },
     { "batch": 2, "imported_at": "2026-11-18T20:42:00.000Z", "source": "files", "photo_count": 1 }

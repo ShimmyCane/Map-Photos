@@ -10,9 +10,9 @@ Legend: [x] built and checked in headless Edge · [ ] not built · [?] built, ne
 - [x] Regions: polyline (double-click to close) and box (any drag direction), text label
 - [x] Regions stay put when zooming (stored in plan units)
 - [x] Save-as with time suffix: Download PDF gives `<name>_photos_YYYYMMDD-HHMMSS.pdf`
-- [ ] Notes (text) tool
-- [ ] Arrow tool
-- [ ] Cloud tool
+- [x] Notes (text) tool (listed under Markup; saved in JSON; drawn into the PDF)
+- [x] Arrow tool (listed under Markup; saved in JSON; drawn into the PDF)
+- [x] Cloud tool (listed under Markup; saved in JSON; drawn into the PDF)
 - [ ] Multi-page PDFs (page navigation; only page 1 is used)
 - [ ] Rotated PDF pages (export refuses with a message)
 

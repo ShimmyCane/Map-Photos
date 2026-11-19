@@ -1,0 +1,354 @@
+{
+  "format": "mapphotos-project",
+  "version": 1,
+  "name": "hollywood_bowl_site_plan",
+  "saved_at": "2026-11-19T12:00:00.000Z",
+  "coordinate_units": "Plan units: PDF points at 100% zoom, origin at the top-left of the page, y increases downward.",
+  "plan": {
+    "file_name": "hollywood_bowl_site_plan.pdf",
+    "path": "hollywood_bowl_site_plan.pdf",
+    "size_bytes": null,
+    "modified": null,
+    "page": 1,
+    "page_width": 955,
+    "page_height": 887
+  },
+  "settings": {
+    "photo_size_percent_of_page_width": 7
+  },
+  "regions": [
+    {
+      "id": 1,
+      "label": "Seating Bowl",
+      "type": "polyline",
+      "closed": true,
+      "points": [
+        {
+          "x": 112,
+          "y": 350
+        },
+        {
+          "x": 150,
+          "y": 262
+        },
+        {
+          "x": 260,
+          "y": 205
+        },
+        {
+          "x": 385,
+          "y": 195
+        },
+        {
+          "x": 385,
+          "y": 300
+        },
+        {
+          "x": 365,
+          "y": 420
+        },
+        {
+          "x": 300,
+          "y": 472
+        },
+        {
+          "x": 200,
+          "y": 482
+        },
+        {
+          "x": 130,
+          "y": 425
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Band Shell and Stage",
+      "type": "box",
+      "x": 255,
+      "y": 140,
+      "width": 175,
+      "height": 85
+    },
+    {
+      "id": 3,
+      "label": "Museum and Terrace",
+      "type": "box",
+      "x": 590,
+      "y": 380,
+      "width": 115,
+      "height": 105
+    },
+    {
+      "id": 4,
+      "label": "Picnic Area 6",
+      "type": "polyline",
+      "closed": true,
+      "points": [
+        {
+          "x": 335,
+          "y": 445
+        },
+        {
+          "x": 520,
+          "y": 445
+        },
+        {
+          "x": 520,
+          "y": 525
+        },
+        {
+          "x": 390,
+          "y": 510
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Lot B",
+      "type": "box",
+      "x": 440,
+      "y": 530,
+      "width": 240,
+      "height": 230
+    },
+    {
+      "id": 6,
+      "label": "Highland Ave Entrance",
+      "type": "box",
+      "x": 760,
+      "y": 330,
+      "width": 130,
+      "height": 330
+    }
+  ],
+  "annotations": [
+    {
+      "id": 1,
+      "type": "note",
+      "x": 30,
+      "y": 30,
+      "text": "SAMPLE PROJECT\nHollywood Bowl walk-through"
+    },
+    {
+      "id": 2,
+      "type": "arrow",
+      "x1": 120,
+      "y1": 104,
+      "x2": 300,
+      "y2": 165
+    },
+    {
+      "id": 3,
+      "type": "note",
+      "x": 30,
+      "y": 78,
+      "text": "Stage: shell faces south-west"
+    },
+    {
+      "id": 4,
+      "type": "cloud",
+      "x": 455,
+      "y": 545,
+      "width": 205,
+      "height": 95
+    },
+    {
+      "id": 5,
+      "type": "note",
+      "x": 455,
+      "y": 650,
+      "text": "Rev A: Lot B layout\nunder review"
+    }
+  ],
+  "import_batches": [
+    {
+      "batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "source": "folder",
+      "photo_count": 9
+    }
+  ],
+  "photos": [
+    {
+      "id": 1,
+      "file_name": "01_laphil_marquee.jpg",
+      "path": "photos/01_laphil_marquee.jpg",
+      "size_bytes": 292503,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:35:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.55,
+      "placed": true,
+      "position": {
+        "x": 800,
+        "y": 610
+      }
+    },
+    {
+      "id": 2,
+      "file_name": "02_tonight_marquee.jpg",
+      "path": "photos/02_tonight_marquee.jpg",
+      "size_bytes": 173812,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:38:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.68,
+      "placed": true,
+      "position": {
+        "x": 790,
+        "y": 380
+      }
+    },
+    {
+      "id": 3,
+      "file_name": "03_muse_fountain.jpg",
+      "path": "photos/03_muse_fountain.jpg",
+      "size_bytes": 222603,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:46:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.59,
+      "placed": true,
+      "position": {
+        "x": 845,
+        "y": 480
+      }
+    },
+    {
+      "id": 4,
+      "file_name": "04_side_view_of_stage.jpg",
+      "path": "photos/04_side_view_of_stage.jpg",
+      "size_bytes": 74407,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:05:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.09,
+      "placed": true,
+      "position": {
+        "x": 200,
+        "y": 420
+      }
+    },
+    {
+      "id": 5,
+      "file_name": "05_aisle_view_to_stage.jpg",
+      "path": "photos/05_aisle_view_to_stage.jpg",
+      "size_bytes": 108847,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:08:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 0.95,
+      "placed": true,
+      "position": {
+        "x": 255,
+        "y": 250
+      }
+    },
+    {
+      "id": 6,
+      "file_name": "06_stage_from_seats.jpg",
+      "path": "photos/06_stage_from_seats.jpg",
+      "size_bytes": 398408,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:12:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.44,
+      "placed": true,
+      "position": {
+        "x": 320,
+        "y": 330
+      }
+    },
+    {
+      "id": 7,
+      "file_name": "07_promenade_walkway.jpg",
+      "path": "photos/07_promenade_walkway.jpg",
+      "size_bytes": 79136,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:18:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.43,
+      "placed": true,
+      "position": {
+        "x": 250,
+        "y": 515
+      }
+    },
+    {
+      "id": 8,
+      "file_name": "08_aerial_of_seating.jpg",
+      "path": "photos/08_aerial_of_seating.jpg",
+      "size_bytes": 57304,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:25:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.73,
+      "placed": true,
+      "position": {
+        "x": 500,
+        "y": 215
+      }
+    },
+    {
+      "id": 9,
+      "file_name": "09_historic_aerial_museum.jpg",
+      "path": "photos/09_historic_aerial_museum.jpg",
+      "size_bytes": 75731,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:30:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.28,
+      "placed": true,
+      "position": {
+        "x": 648,
+        "y": 440
+      }
+    }
+  ]
+}
