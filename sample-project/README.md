@@ -30,6 +30,19 @@ The three tools are in the left rail under the region tools. Click the tool, the
 9. **Revision cloud** (cloud icon): drag a rectangle around the area that changed.
 10. Everything you add is listed under **Markup** in the right panel. Use **Edit** to change a note, **Delete** to remove an item, or **Clear all markup**.
 
+## Tags, tabs and the pointer
+
+Tags are labels for photos, separate from regions. The sample has three: Ticketing, Stage view and Seating. Each tag with **Tab** ticked appears as a coloured tab above the plan.
+
+- Click a tab to show only that tag's photos on the plan. **All photos** shows everything.
+- Drag a photo card onto a tab to tag it. Dropped while you are viewing a different tab, it moves: it comes off the tab you were viewing.
+- Choose the **pointer** tool (arrow icon in the left rail), then click a photo on the plan to select it. Drag it to move it. The **Selected photo** panel on the right lists every tag with a tick box, and a **Move / Add** control.
+- Add your own tags in the **Tags** panel. Pick a colour with the swatch. Untick **Tab** to keep a tag off the tab bar.
+
+## Schemes
+
+The **Scheme** panel switches between sets of regions on the same plan. The sample has an Areas scheme. Use **New** to start another, for example Trades with Mechanical and Electrical regions. Regions you draw go into the scheme shown.
+
 ## Draw your own region
 
 11. Pick the **polyline** tool (click points, double-click to close) or the **box** tool (drag), then name the region.
