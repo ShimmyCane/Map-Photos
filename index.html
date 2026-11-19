@@ -491,6 +491,21 @@
                         </div>
                         <div class="photo-help">Areas is the base layer: its region names make the photo file names, and it cannot be renamed or deleted. A new layer's name becomes a tag. Regions you draw go into the layer shown here.</div>
                     </div>
+                    <div class="section" id="vis-section">
+                        <div class="section-title">Visibility <span>(base layer)</span></div>
+                        <div class="scheme-row">
+                            <select id="vis-mode" class="select" title="OR: a photo shows if any of its ticked tags is ticked. AND: only if all of its tags are ticked.">
+                                <option value="or">Any ticked tag (OR)</option>
+                                <option value="and">All its tags ticked (AND)</option>
+                            </select>
+                        </div>
+                        <div id="vis-list"></div>
+                        <div class="scheme-row" style="margin-top:6px">
+                            <button class="btn btn-sm" id="vis-all">All on</button>
+                            <button class="btn btn-sm" id="vis-none">All off</button>
+                        </div>
+                        <div class="photo-help">Untick a tag to hide the photos that carry it. Only the plan changes; the photo list still shows everything.</div>
+                    </div>
                     <div class="section">
                         <div class="section-title">Regions</div>
                         <div id="regions-list"></div>
@@ -644,6 +659,9 @@
         let nextTagId = 1;
         let activeTab = null;     // tag id of the tab being viewed; null = all photos
         let selectedPhotoId = null;
+        let visMode = 'or';           // plan visibility on the base layer: 'or' or 'and'
+        let hiddenTags = new Set();   // tag ids switched off (new tags are on by default)
+        let showUntagged = true;
         let annotations = [];     // markup: notes, arrows, clouds (plan units, like regions)
         let nextAnnotId = 1;
         let currentAnn = null;    // markup being dragged out
@@ -1153,6 +1171,35 @@
             updatePhotoGrid();
             scheduleAutosave();
         }
+        // Base layer only: a photo shows if any (OR) or all (AND) of its tags are on. Untagged photos follow their own tick.
+        function visOK(p) {
+            if (activeSchemeId !== schemes[0].id) return true;
+            const ids = p.tags || [];
+            if (!ids.length) return showUntagged;
+            const on = (id) => !hiddenTags.has(id);
+            return visMode === 'and' ? ids.every(on) : ids.some(on);
+        }
+        function setVisTag(id, on) {
+            if (on) hiddenTags.delete(id); else hiddenTags.add(id);
+            updatePhotoGrid();
+        }
+        function setAllVis(on) {
+            hiddenTags = on ? new Set() : new Set(tags.map((t) => t.id));
+            updatePhotoGrid();
+        }
+        function renderVisibility() {
+            const onBase = activeSchemeId === schemes[0].id;
+            document.getElementById('vis-section').style.display = onBase ? '' : 'none';
+            document.getElementById('vis-mode').value = visMode;
+            document.getElementById('vis-list').innerHTML = tags.map((t) => `
+                <label class="check tag-checks-row"><input type="checkbox" ${hiddenTags.has(t.id) ? '' : 'checked'} onchange="setVisTag(${t.id}, this.checked)">
+                <span class="tag-dot" style="background:${t.color}"></span>${escapeHtml(t.name)}</label>`).join('')
+                + `<label class="check tag-checks-row"><input type="checkbox" ${showUntagged ? 'checked' : ''} onchange="showUntagged = this.checked; updatePhotoGrid()"> <i class="tag-dot" style="background:transparent"></i>Untagged photos</label>`;
+        }
+        document.getElementById('vis-mode').addEventListener('change', (e) => { visMode = e.target.value; updatePhotoGrid(); scheduleAutosave(); });
+        document.getElementById('vis-all').addEventListener('click', () => setAllVis(true));
+        document.getElementById('vis-none').addEventListener('click', () => setAllVis(false));
+
         function setTagColor(id, hex) {
             const t = tagById(id);
             if (t) { t.color = hex; updatePhotoGrid(); }
@@ -1170,6 +1217,7 @@
             const n = photos.filter((p) => (p.tags || []).includes(id)).length;
             if (!confirm(`Delete the tag "${t.name}"?${n ? ` It is taken off ${n} photo(s).` : ''}`)) return;
             tags = tags.filter((x) => x.id !== id);
+            hiddenTags.delete(id);
             photos.forEach((p) => removeTagFromPhoto(p, id));
             if (activeTab === id) activeTab = null;
             updatePhotoGrid();
@@ -1674,6 +1722,7 @@
                 }).join('');
             }
             renderSchemes();
+            renderVisibility();
             renderTags();
             renderTabs();
             renderInspector();
@@ -1751,7 +1800,7 @@
 
         function renderMarkers() {
             markerLayer.innerHTML = '';
-            photos.filter((p) => p.pos && isShown(p) && tabOK(p)).forEach((p) => {
+            photos.filter((p) => p.pos && isShown(p) && tabOK(p) && visOK(p)).forEach((p) => {
                 const el = document.createElement('div');
                 el.className = 'photo-marker' + (p.id === selectedPhotoId ? ' selected' : '');
                 el.dataset.id = p.id;
@@ -2132,6 +2181,7 @@
                 active_scheme: activeSchemeId,
                 schemes: schemes.map((s) => ({ id: s.id, name: s.name, regions: s.regions.map(regionJson) })),
                 tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color, tab: !!t.tab })),
+                visibility: { mode: visMode, untagged: showUntagged, hidden_tags: [...hiddenTags] },
                 annotations: annotations.map((a) => (a.type === 'note'
                     ? { id: a.id, type: 'note', x: round(a.x), y: round(a.y), text: a.text }
                     : a.type === 'arrow'
@@ -2190,6 +2240,9 @@
                 id: t.id, name: String(t.name), color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : TAG_COLORS[i % TAG_COLORS.length], tab: !!t.tab
             }));
             nextTagId = tags.reduce((m, t) => Math.max(m, t.id), 0) + 1;
+            visMode = json.visibility && json.visibility.mode === 'and' ? 'and' : 'or';
+            showUntagged = !json.visibility || json.visibility.untagged !== false;
+            hiddenTags = new Set((json.visibility && json.visibility.hidden_tags || []).filter((id) => tags.some((t) => t.id === id)));
             activeTab = null;
             selectedPhotoId = null;
             annotations = (json.annotations || []).filter((a) => ['note', 'arrow', 'cloud'].includes(a.type)).map((a, i) => ({ ...a, id: Number.isInteger(a.id) ? a.id : i + 1 }));
