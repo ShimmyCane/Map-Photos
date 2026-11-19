@@ -23,6 +23,7 @@ Legend: [x] built and checked in headless Edge · [ ] not built · [?] built, ne
 - [x] Small thumbnails in the side panel
 - [x] Drag a photo anywhere on the plan (no region needed); drag the marker to move; double-click to remove
 - [x] Drop image files straight from the desktop onto the plan: imported and placed where dropped
+- [x] Key numbers: a placed photo shows on the plan as a numbered circle (1, 2, 3 ...); hover the circle to see the photo. Number kept in the JSON as `key`; on the PDF the number is in each photo's caption
 - [x] Marker size scales with zoom; ⚙️ Settings (toolbar button or corner gear) has a live size slider for all photos, even after they are placed, plus Reset. Saved in the project JSON
 - [x] Load a folder of photos (keeps relative paths) as well as individual files; each load is recorded as an import batch
 - [x] Region tag comes from where the photo sits (shown as the region name, "on plan", or "not placed")
