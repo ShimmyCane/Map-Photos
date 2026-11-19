@@ -54,6 +54,7 @@ With the **Areas** layer active, the **Visibility** panel lists every tag. Untic
 Click **Map** at the top left. The map uses OpenStreetMap tiles (internet needed for the map only; your plan and photos stay on this device).
 
 1. Set the **drawing scale** (1:N, from the plan's title block), the **rotation** (degrees clockwise from north for the top of the plan) and the **centre** (type the coordinates, or click the map after pressing *Click map to set centre*).
+   Or choose **Reference points** as the placement method: add two or more pairs, each a distinctive spot on the plan preview (a gate, a corner) followed by the same spot on the map. Scale, rotation and centre are fitted from the pairs, and each pair's error is shown in metres. Zoom the map in before clicking the map point. Remove any pair with a large error.
 2. Check the plan on the map: the red frame is the plan and its top edge is marked. Use the opacity slider to compare. Confirm only when the size and direction look right.
 3. Photos with a GPS tag appear on the map faded. Tick the ones that belong on this plan, then press **Import approved**. They go onto the Plan view at their map positions. Photos outside the plan are not imported.
 

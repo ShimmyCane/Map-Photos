@@ -356,6 +356,12 @@
         .geo-row.outside { opacity: 0.6; }
         .geo-row img { width: 42px; height: 32px; object-fit: cover; display: block; border: 1px solid var(--ink); flex: none; }
         .geo-row .label { font-size: 10px; }
+        .geo-plan-pick { width: 100%; display: block; margin: 6px 0; border: 1px solid var(--ink); cursor: crosshair; background: var(--sheet); }
+        .geo-ref-row { display: flex; gap: 6px; align-items: center; padding: 4px 6px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--sheet); font-size: 11px; }
+        .geo-ref-row .geo-ref-text { flex: 1; min-width: 0; line-height: 1.35; }
+        .geo-ref-pt { width: 22px !important; height: 22px !important; border-radius: 50%; background: var(--ochre); color: var(--sheet); border: 1px solid var(--ink-black); font-family: var(--font-technical); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-paper); }
+        .geo-fit { font-size: 12px; line-height: 1.45; padding: 6px 8px; margin: 6px 0; border: 1px dashed var(--border-dark); background: var(--sheet); }
+        .geo-fit.warn { color: var(--red); }
         .plan-tab { font-family: var(--font-technical); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--border-dark); border-bottom: 0; border-top: 4px solid var(--tab, var(--ink)); background: var(--sheet); color: var(--ink); cursor: pointer; }
         .plan-tab.active { background: var(--panel-hover); box-shadow: inset 0 -3px 0 var(--tab, var(--ink)); font-weight: 600; }
         .plan-tab.drop { outline: 2px dashed var(--ink); outline-offset: -4px; }
@@ -516,6 +522,12 @@
                         <div class="section">
                             <div class="section-title">Plan on map</div>
                             <div id="geo-status" class="geo-status"></div>
+                            <label class="geo-field">Placement method
+                                <select id="geo-method" class="select">
+                                    <option value="centre">Centre point + scale + rotation</option>
+                                    <option value="refs">Reference points (two or more)</option>
+                                </select>
+                            </label>
                             <label class="geo-field">Drawing scale 1 : <input type="number" class="input" id="geo-ratio" min="1" step="1" value="100"></label>
                             <label class="geo-field">Rotation (degrees clockwise from north; 0 = top of plan points north)
                                 <input type="number" class="input" id="geo-rot" step="0.5" value="0">
@@ -532,6 +544,16 @@
                             </div>
                             <label class="geo-field">Opacity <input type="range" id="geo-opacity" min="0" max="1" step="0.05" value="0.6"></label>
                             <label class="check"><input type="checkbox" id="geo-show" checked> Show plan on map</label>
+                            <div id="geo-refs-block" hidden>
+                                <div class="photo-help">Add point, click a distinctive spot on the plan above (a gate, a corner), then the same spot on the map. Two points fix scale and rotation exactly; more points average out small mistakes. Zoom the map in for accuracy.</div>
+                                <canvas id="geo-plan-pick" class="geo-plan-pick" title="Click a spot on the plan"></canvas>
+                                <div class="scheme-row">
+                                    <button class="btn btn-sm btn-primary" id="ref-add">Add point</button>
+                                    <button class="btn btn-sm" id="ref-cancel">Cancel</button>
+                                </div>
+                                <div id="geo-ref-list"></div>
+                                <div id="geo-fit" class="geo-fit"></div>
+                            </div>
                             <div id="geo-readout" class="geo-readout"></div>
                             <div class="scheme-row">
                                 <button class="btn btn-primary btn-sm" id="geo-confirm">Confirm placement</button>
@@ -736,6 +758,9 @@
         let geo = null;               // map placement of the plan: { lat, lng, ratio, rot, opacity, show, confirmed }
         let geoMap = null, geoCanvas = null, geoPhotoLayer = null, overlayImg = null, overlayBusy = false, geoPicking = false;
         const geoApproved = new Set();   // photo ids ticked for import
+        let refPick = { step: null, planPt: null };   // reference point being added: step 'plan' or 'map'
+        let geoRefLayer = null;
+        let refFitError = null;
         let visMode = 'or';           // plan visibility on the base layer: 'or' or 'and'
         let hiddenTags = new Set();   // tag ids switched off (new tags are on by default)
         let showUntagged = true;
@@ -1575,6 +1600,10 @@
 
         function syncGeoInputs() {
             const v = (id, val) => { const el = document.getElementById(id); if (document.activeElement !== el) el.value = val; };
+            const refsMode = !!geo && geo.method === 'refs';
+            ['geo-ratio', 'geo-rot', 'geo-rot-slider', 'geo-lat', 'geo-lng', 'geo-use-view', 'geo-pick'].forEach((id) => { document.getElementById(id).disabled = refsMode; });
+            document.getElementById('geo-method').value = geo ? geo.method : 'centre';
+            document.getElementById('geo-refs-block').hidden = !refsMode;
             const g = geo || { lat: '', lng: '', ratio: 100, rot: 0, opacity: 0.6, show: true };
             v('geo-ratio', g.ratio);
             v('geo-rot', g.rot);
@@ -1591,6 +1620,7 @@
             const box = document.getElementById('geo-readout');
             const btnPick = document.getElementById('geo-pick');
             btnPick.classList.toggle('active', geoPicking);
+            if (geo && geo.method === 'refs' && pdfDoc) { renderRefs(); }
             if (!pdfDoc) {
                 status.textContent = 'Load a plan in Plan view first';
                 status.className = 'geo-status warn';
@@ -1625,14 +1655,17 @@
             geoPhotoLayer = L.layerGroup().addTo(geoMap);
             geoMap.on('move zoom viewreset resize moveend zoomend', drawOverlay);
             geoMap.on('click', (e) => {
+                if (refPick.step === 'map' && refPick.planPt) { addRef(refPick.planPt, e.latlng); showToast('Point added'); return; }
                 if (!geoPicking) return;
                 geoPicking = false;
                 setGeo({ lat: e.latlng.lat, lng: e.latlng.lng });
                 showToast('Centre set. Now check the scale and rotation.');
             });
+            geoRefLayer = L.layerGroup().addTo(geoMap);
             syncGeoInputs();
             renderGeoPhotos();
             renderGeoList();
+            renderRefs();
             drawOverlay();
         }
 
@@ -1708,6 +1741,29 @@
         }
 
         // Wiring
+        document.getElementById('geo-method').addEventListener('change', (e) => setMethod(e.target.value));
+        document.getElementById('ref-add').addEventListener('click', () => {
+            if (!pdfDoc) return showToast('Load a plan first');
+            refPick = { step: 'plan', planPt: null };
+            showToast('Click a spot on the plan preview');
+            updateRefButtons();
+        });
+        document.getElementById('ref-cancel').addEventListener('click', () => {
+            refPick = { step: null, planPt: null };
+            renderRefPreview();
+            updateRefButtons();
+        });
+        document.getElementById('geo-plan-pick').addEventListener('click', (e) => {
+            if (refPick.step !== 'plan') return showToast('Press Add point first');
+            const r = e.currentTarget.getBoundingClientRect();
+            refPick = { step: 'map', planPt: { x: (e.clientX - r.left) / r.width * pageW, y: (e.clientY - r.top) / r.height * pageH } };
+            renderRefPreview();
+            updateRefButtons();
+            showToast('Now click the same spot on the map');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && refPick.step) { refPick = { step: null, planPt: null }; renderRefPreview(); updateRefButtons(); }
+        });
         document.getElementById('view-plan').addEventListener('click', () => setView('plan'));
         document.getElementById('view-map').addEventListener('click', () => setView('map'));
         ['geo-ratio', 'geo-rot', 'geo-lat', 'geo-lng'].forEach((id) => document.getElementById(id).addEventListener('change', (e) => {
@@ -1741,6 +1797,7 @@
         });
         document.getElementById('geo-confirm').addEventListener('click', () => {
             if (!geo || !pdfDoc) return showToast('Place the plan first');
+            if (geo.method === 'refs' && (geo.refs || []).length < 2) return showToast('Add at least two points first');
             geo.confirmed = true;
             updateGeoReadout();
             renderGeoList();
@@ -1770,6 +1827,171 @@
             renderGeoList();
         });
         document.getElementById('geo-import').addEventListener('click', importApproved);
+
+        // ---------- Reference points: least-squares fit of scale, rotation and centre ----------
+        // Model (plan centred on its middle, y down):  E = A·x + C·y + tE,  N = C·x − A·y + tN  (metres from the first point).
+        // A = k·cos(b), C = −k·sin(b): k = metres per plan point, b = the plan's top bearing.
+        function solveLinear(M, v) {
+            const n = v.length;
+            const A = M.map((row, i) => [...row, v[i]]);
+            const scale = Math.max(...M.flat().map(Math.abs)) || 1;
+            for (let c = 0; c < n; c++) {
+                let piv = c;
+                for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+                if (Math.abs(A[piv][c]) < 1e-12 * scale) return null;
+                [A[c], A[piv]] = [A[piv], A[c]];
+                for (let r = 0; r < n; r++) {
+                    if (r === c) continue;
+                    const f = A[r][c] / A[c][c];
+                    for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k];
+                }
+            }
+            return A.map((row, i) => row[n] / row[i]);
+        }
+        const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+
+        // Fits geo (centre, ratio, rot) to the reference points. Returns true on success.
+        function fitRefs() {
+            const refs = geo.refs || [];
+            refFitError = null;
+            if (refs.length < 2) { refFitError = 'Add at least two points.'; return false; }
+            const lat0 = refs[0].map.lat, lng0 = refs[0].map.lng;
+            const cosLat = Math.cos(lat0 * Math.PI / 180);
+            const cx = pageW / 2, cy = pageH / 2;
+            const M = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+            const v = [0, 0, 0, 0];
+            const addRow = (r, b) => {
+                for (let i = 0; i < 4; i++) { v[i] += r[i] * b; for (let j = 0; j < 4; j++) M[i][j] += r[i] * r[j]; }
+            };
+            refs.forEach(({ plan, map }) => {
+                const x = plan.x - cx, y = plan.y - cy;
+                const E = (map.lng - lng0) * 111320 * cosLat, N = (map.lat - lat0) * 111320;
+                addRow([x, y, 1, 0], E);
+                addRow([-y, x, 0, 1], N);
+            });
+            const u = solveLinear(M, v);
+            if (!u) { refFitError = 'The points are too close together or in a line. Spread them over the plan.'; return false; }
+            const [A, C, tE, tN] = u;
+            const k = Math.hypot(A, C);
+            if (!(k > 0)) { refFitError = 'The points do not give a scale. Check the matches.'; return false; }
+            const b = Math.atan2(-C, A);
+            geo.ratio = k / M_PER_PAPER_PT;
+            geo.rot = normDeg(b * 180 / Math.PI);
+            geo.lat = lat0 + tN / 111320;
+            geo.lng = lng0 + tE / (111320 * cosLat);
+            geo.confirmed = false;
+            return true;
+        }
+
+        // Distance in metres between each reference's map point and where the current placement puts its plan point.
+        function refErrors() {
+            if (!geo || !pdfDoc || (geo.refs || []).length < 2) return [];
+            return geo.refs.map((r) => {
+                const pr = planToLatLng(r.plan.x, r.plan.y);
+                return Math.hypot((r.map.lat - pr.lat) * mPerDegLat, (r.map.lng - pr.lng) * mPerDegLng());
+            });
+        }
+
+        function addRef(planPt, ll) {
+            ensureGeo();
+            geo.method = 'refs';
+            geo.refs = geo.refs || [];
+            geo.refs.push({ plan: { x: planPt.x, y: planPt.y }, map: { lat: ll.lat, lng: ll.lng } });
+            refPick = { step: null, planPt: null };
+            if (geo.refs.length >= 2) fitRefs();
+            afterRefChange();
+        }
+        function removeRef(i) {
+            if (!geo || !geo.refs) return;
+            geo.refs.splice(i, 1);
+            if (geo.refs.length >= 2) fitRefs(); else { refFitError = 'Add at least two points.'; geo.confirmed = false; }
+            afterRefChange();
+        }
+        function afterRefChange() {
+            syncGeoInputs();
+            renderRefs();
+            renderRefPreview();
+            drawOverlay();
+            renderGeoList();
+            updateRefButtons();
+            scheduleAutosave();
+        }
+
+        function renderRefs() {
+            const refs = geo && geo.refs ? geo.refs : [];
+            const errs = refErrors();
+            document.getElementById('geo-ref-list').innerHTML = refs.map((r, i) => `
+                <div class="geo-ref-row">
+                    <span class="geo-ref-text"><b>${i + 1}</b> plan ${r.plan.x.toFixed(0)}, ${r.plan.y.toFixed(0)}<br>
+                    <span class="label">map ${r.map.lat.toFixed(6)}, ${r.map.lng.toFixed(6)}${errs.length ? ` · error ${errs[i].toFixed(2)} m` : ''}</span></span>
+                    <button class="btn btn-sm btn-danger" onclick="removeRef(${i})">Remove</button>
+                </div>`).join('') || '<p class="empty-note">No points yet.</p>';
+            const fit = document.getElementById('geo-fit');
+            if (!pdfDoc) fit.textContent = 'Load a plan first.';
+            else if (refFitError) { fit.className = 'geo-fit warn'; fit.textContent = refFitError; }
+            else if (refs.length < 2) { fit.className = 'geo-fit'; fit.textContent = 'Add at least two points to fit the placement.'; }
+            else {
+                const mean = errs.reduce((a, e) => a + e, 0) / errs.length, max = Math.max(...errs);
+                const planM = Math.max(pageW, pageH) * metresPerPt();
+                const warn = max > planM * 0.01;
+                fit.className = 'geo-fit' + (warn ? ' warn' : '');
+                fit.textContent = `Fitted from ${refs.length} points: scale 1:${Math.round(geo.ratio)}, rotation ${geo.rot.toFixed(1)}° clockwise from north. Mean error ${mean.toFixed(2)} m, largest ${max.toFixed(2)} m.`
+                    + (warn ? ' The largest error is over 1% of the plan: check that point, or remove it.' : '');
+            }
+            renderRefMarkers();
+        }
+        function renderRefMarkers() {
+            if (!geoMap || !geoRefLayer) return;
+            geoRefLayer.clearLayers();
+            ((geo && geo.refs) || []).forEach((r, i) => {
+                L.marker([r.map.lat, r.map.lng], {
+                    icon: L.divIcon({ className: 'geo-ref-pt-wrap', html: `<div class="geo-ref-pt">${i + 1}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
+                    interactive: false
+                }).addTo(geoRefLayer);
+            });
+        }
+
+        // The plan as a small picker: a click gives the plan coordinate of a reference point.
+        function renderRefPreview() {
+            const c = document.getElementById('geo-plan-pick');
+            if (!c || !pdfDoc) return;
+            if (!overlayImg) { ensureOverlayImage().then(renderRefPreview); return; }
+            c.width = 560;
+            c.height = Math.round(560 * pageH / pageW);
+            c.style.height = 'auto';
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, c.width, c.height);
+            ctx.drawImage(overlayImg, 0, 0, c.width, c.height);
+            const at = (pt) => ({ x: pt.x / pageW * c.width, y: pt.y / pageH * c.height });
+            ((geo && geo.refs) || []).forEach((r, i) => drawPickDot(ctx, at(r.plan), String(i + 1), '#B08C55'));
+            if (refPick.planPt) drawPickDot(ctx, at(refPick.planPt), '?', '#B76556');
+        }
+        function drawPickDot(ctx, pt, label, color) {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#242421';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#FAF8F2';
+            ctx.font = '600 12px "IBM Plex Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, pt.x, pt.y + 0.5);
+        }
+        function updateRefButtons() {
+            const add = document.getElementById('ref-add');
+            add.textContent = refPick.step === 'plan' ? 'Click the plan…' : refPick.step === 'map' ? 'Click the map…' : 'Add point';
+            document.getElementById('ref-cancel').disabled = !refPick.step;
+            if (!geoMap && !refPick.step) return;
+        }
+        function setMethod(m) {
+            ensureGeo();
+            geo.method = m;
+            if (m === 'refs' && (geo.refs || []).length >= 2) fitRefs();
+            afterRefChange();
+        }
 
         // ---------- Regions ----------
         function pointInPolygon(x, y, pts) {
@@ -2552,7 +2774,11 @@
                 schemes: schemes.map((s) => ({ id: s.id, name: s.name, regions: s.regions.map(regionJson) })),
                 tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color, tab: !!t.tab })),
                 visibility: { mode: visMode, untagged: showUntagged, hidden_tags: [...hiddenTags] },
-                geo: geo ? { lat: round(geo.lat * 1e6) / 1e6, lng: round(geo.lng * 1e6) / 1e6, ratio: geo.ratio, rot: geo.rot, opacity: geo.opacity, show: !!geo.show, confirmed: !!geo.confirmed } : null,
+                geo: geo ? {
+                    lat: round(geo.lat * 1e6) / 1e6, lng: round(geo.lng * 1e6) / 1e6, ratio: geo.ratio, rot: round(geo.rot * 100) / 100,
+                    opacity: geo.opacity, show: !!geo.show, confirmed: !!geo.confirmed, method: geo.method || 'centre',
+                    refs: (geo.refs || []).map((r) => ({ plan: { x: round(r.plan.x), y: round(r.plan.y) }, map: { lat: round(r.map.lat * 1e7) / 1e7, lng: round(r.map.lng * 1e7) / 1e7 } }))
+                } : null,
                 annotations: annotations.map((a) => (a.type === 'note'
                     ? { id: a.id, type: 'note', x: round(a.x), y: round(a.y), text: a.text }
                     : a.type === 'arrow'
@@ -2611,7 +2837,8 @@
                 id: t.id, name: String(t.name), color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : TAG_COLORS[i % TAG_COLORS.length], tab: !!t.tab
             }));
             nextTagId = tags.reduce((m, t) => Math.max(m, t.id), 0) + 1;
-            geo = json.geo ? { ...json.geo } : null;
+            geo = json.geo ? { ...json.geo, method: json.geo.method === 'refs' ? 'refs' : 'centre', refs: json.geo.refs || [] } : null;
+            refPick = { step: null, planPt: null };
             geoApproved.clear();
             geoPicking = false;
             visMode = json.visibility && json.visibility.mode === 'and' ? 'and' : 'or';
@@ -2669,6 +2896,8 @@
             updateRegionsList();
             redrawAnnotations();
             syncGeoInputs();
+            renderRefs();
+            renderRefPreview();
             drawOverlay();
             unsavedChanges = false;
             lastSave = null;
