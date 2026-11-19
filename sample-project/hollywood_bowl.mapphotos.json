@@ -14,7 +14,7 @@
     "page_height": 887
   },
   "settings": {
-    "photo_size_percent_of_page_width": 8
+    "photo_size_percent_of_page_width": 7
   },
   "regions": [
     {
@@ -166,7 +166,7 @@
       "batch": 1,
       "imported_at": "2026-11-19T12:00:00.000Z",
       "source": "folder",
-      "photo_count": 5
+      "photo_count": 9
     }
   ],
   "photos": [
@@ -252,8 +252,28 @@
     },
     {
       "id": 5,
-      "file_name": "05_stage_from_seats.jpg",
-      "path": "photos/05_stage_from_seats.jpg",
+      "file_name": "05_aisle_view_to_stage.jpg",
+      "path": "photos/05_aisle_view_to_stage.jpg",
+      "size_bytes": 108847,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:08:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 0.95,
+      "placed": true,
+      "position": {
+        "x": 255,
+        "y": 250
+      }
+    },
+    {
+      "id": 6,
+      "file_name": "06_stage_from_seats.jpg",
+      "path": "photos/06_stage_from_seats.jpg",
       "size_bytes": 398408,
       "modified": null,
       "format": "jpg",
@@ -268,6 +288,66 @@
       "position": {
         "x": 320,
         "y": 330
+      }
+    },
+    {
+      "id": 7,
+      "file_name": "07_promenade_walkway.jpg",
+      "path": "photos/07_promenade_walkway.jpg",
+      "size_bytes": 79136,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:18:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.43,
+      "placed": true,
+      "position": {
+        "x": 250,
+        "y": 515
+      }
+    },
+    {
+      "id": 8,
+      "file_name": "08_aerial_of_seating.jpg",
+      "path": "photos/08_aerial_of_seating.jpg",
+      "size_bytes": 57304,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:25:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.73,
+      "placed": true,
+      "position": {
+        "x": 500,
+        "y": 215
+      }
+    },
+    {
+      "id": 9,
+      "file_name": "09_historic_aerial_museum.jpg",
+      "path": "photos/09_historic_aerial_museum.jpg",
+      "size_bytes": 75731,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:30:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.28,
+      "placed": true,
+      "position": {
+        "x": 648,
+        "y": 440
       }
     }
   ]
