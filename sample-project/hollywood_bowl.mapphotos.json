@@ -14,7 +14,7 @@
     "page_height": 887
   },
   "settings": {
-    "photo_size_percent_of_page_width": 6
+    "photo_size_percent_of_page_width": 8
   },
   "regions": [
     {
@@ -161,6 +161,114 @@
       "text": "Rev A: Lot B layout\nunder review"
     }
   ],
-  "import_batches": [],
-  "photos": []
+  "import_batches": [
+    {
+      "batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "source": "folder",
+      "photo_count": 5
+    }
+  ],
+  "photos": [
+    {
+      "id": 1,
+      "file_name": "01_laphil_marquee.jpg",
+      "path": "photos/01_laphil_marquee.jpg",
+      "size_bytes": 292503,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:35:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.55,
+      "placed": true,
+      "position": {
+        "x": 800,
+        "y": 610
+      }
+    },
+    {
+      "id": 2,
+      "file_name": "02_tonight_marquee.jpg",
+      "path": "photos/02_tonight_marquee.jpg",
+      "size_bytes": 173812,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:38:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.68,
+      "placed": true,
+      "position": {
+        "x": 790,
+        "y": 380
+      }
+    },
+    {
+      "id": 3,
+      "file_name": "03_muse_fountain.jpg",
+      "path": "photos/03_muse_fountain.jpg",
+      "size_bytes": 222603,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T17:46:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.59,
+      "placed": true,
+      "position": {
+        "x": 845,
+        "y": 480
+      }
+    },
+    {
+      "id": 4,
+      "file_name": "04_side_view_of_stage.jpg",
+      "path": "photos/04_side_view_of_stage.jpg",
+      "size_bytes": 74407,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:05:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.09,
+      "placed": true,
+      "position": {
+        "x": 200,
+        "y": 420
+      }
+    },
+    {
+      "id": 5,
+      "file_name": "05_stage_from_seats.jpg",
+      "path": "photos/05_stage_from_seats.jpg",
+      "size_bytes": 398408,
+      "modified": null,
+      "format": "jpg",
+      "import_batch": 1,
+      "imported_at": "2026-11-19T12:00:00.000Z",
+      "taken_at": "2026-10-10T18:12:00.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1.44,
+      "placed": true,
+      "position": {
+        "x": 320,
+        "y": 330
+      }
+    }
+  ]
 }
