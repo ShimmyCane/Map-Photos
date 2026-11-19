@@ -160,6 +160,11 @@
             border-left: 2px solid var(--blue);
             font-size: 12px;
         }
+        .markup-item { border-left-color: var(--ochre); }
+        .markup-item.cloud { border-left-color: var(--red); }
+        .markup-item.arrow { border-left-color: var(--ink); }
+        .markup-item .markup-actions { display: flex; gap: 4px; flex: none; }
+        .markup-kind { font-family: var(--font-technical); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--graphite); margin-right: 6px; }
         .region-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         .region-filter { display: flex; align-items: center; gap: var(--space-2); padding: 5px 8px; margin-bottom: 2px; font-size: 12px; border: 1px solid transparent; }
@@ -353,6 +358,9 @@
         <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
         <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="11" x2="11" y1="8" y2="14" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
         <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
+        <symbol id="i-type" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7" /> <line x1="9" x2="15" y1="20" y2="20" /> <line x1="12" x2="12" y1="4" y2="20" /></symbol>
+        <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></symbol>
+        <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></symbol>
     </defs></svg>  <!-- Lucide icons (ISC licence) -->
     <div class="app">
         <header class="app-header">
@@ -397,6 +405,10 @@
                 <button class="tool-btn" id="polyline-btn" title="Polyline region: click points, double-click to close"><svg class="icon"><use href="#i-pen-tool"/></svg></button>
                 <button class="tool-btn" id="box-btn" title="Box region: drag a rectangle"><svg class="icon"><use href="#i-square"/></svg></button>
                 <div class="rule"></div>
+                <button class="tool-btn" id="note-btn" title="Text note: click on the plan, then type"><svg class="icon"><use href="#i-type"/></svg></button>
+                <button class="tool-btn" id="arrow-btn" title="Arrow: drag from the tail to the point"><svg class="icon"><use href="#i-arrow-up-right"/></svg></button>
+                <button class="tool-btn" id="cloud-btn" title="Revision cloud: drag a rectangle around the change"><svg class="icon"><use href="#i-cloud"/></svg></button>
+                <div class="rule"></div>
                 <button class="tool-btn" id="clear-regions-btn" title="Clear all regions"><svg class="icon"><use href="#i-trash-2"/></svg></button>
             </nav>
 
@@ -425,6 +437,10 @@
                     <div class="section">
                         <div class="section-title">Regions</div>
                         <div id="regions-list"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Markup <span id="markup-count"></span></div>
+                        <div id="markup-list"></div>
                     </div>
                     <div class="section">
                         <div class="section-title">Filter by region</div>
@@ -513,6 +529,17 @@
         </div>
     </div>
 
+    <div class="modal" id="note-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="note-modal-title">Text note</div>
+            <textarea class="textarea" id="note-text-input" rows="4" style="width:100%;box-sizing:border-box;resize:vertical" placeholder="Type the note. Enter adds a line, Ctrl+Enter saves."></textarea>
+            <div class="modal-buttons">
+                <button class="btn btn-primary confirm" onclick="confirmNote()">Save</button>
+                <button class="btn cancel" onclick="cancelNote()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="label-modal">
         <div class="modal-content">
             <div class="modal-title">Label this region</div>
@@ -539,6 +566,10 @@
         let pageW = 0, pageH = 0;
         let renderTask = null;
         let regions = [];
+        let annotations = [];     // markup: notes, arrows, clouds (plan units, like regions)
+        let nextAnnotId = 1;
+        let currentAnn = null;    // markup being dragged out
+        let pendingNote = null;   // { id|null, x, y } while the note dialog is open
         let photos = [];
         let nextRegionId = 1;
         let nextPhotoId = 1;
@@ -652,7 +683,7 @@
             if (!palette) {
                 const css = getComputedStyle(document.documentElement);
                 const t = (n) => css.getPropertyValue(n).trim();
-                palette = { blue: t('--blue'), ochre: t('--ochre'), ink: t('--ink'), sheet: t('--sheet') };
+                palette = { blue: t('--blue'), ochre: t('--ochre'), ochreWash: t('--ochre-wash'), red: t('--red'), ink: t('--ink'), inkBlack: t('--ink-black'), sheet: t('--sheet') };
             }
             return palette;
         }
@@ -704,6 +735,8 @@
         function redrawAnnotations() {
             annotCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
             regions.forEach((r) => drawRegion(r, false));
+            annotations.forEach((a) => drawAnnotation(a, false));
+            if (currentAnn) drawAnnotation(currentAnn, true);
             if (currentRegion && (currentRegion.type === 'box' || currentRegion.points.length > 0)) {
                 drawRegion(currentRegion, true);
                 if (currentRegion.type === 'polyline') {
@@ -717,16 +750,157 @@
             }
         }
 
+        // ---------- Markup: notes, arrows, revision clouds ----------
+        // Everything is stored in plan units, so it stays put when zooming and lands in the same place in the exported PDF.
+        const annLw = () => Math.max(1.5, pageW / 500);          // line width, plan units
+        const noteFs = () => Math.max(9, pageW / 90);            // note text size, plan units
+        const r2 = (n) => Math.round(n * 100) / 100;
+
+        function arrowPaths(a) {
+            const dx = a.x2 - a.x1, dy = a.y2 - a.y1;
+            const len = Math.hypot(dx, dy) || 1;
+            const ux = dx / len, uy = dy / len;
+            const hl = Math.min(len * 0.6, annLw() * 8), hw = hl * 0.45;
+            const bx = a.x2 - ux * hl, by = a.y2 - uy * hl;
+            return {
+                line: `M${r2(a.x1)} ${r2(a.y1)}L${r2(bx)} ${r2(by)}`,
+                head: `M${r2(a.x2)} ${r2(a.y2)}L${r2(bx - uy * hw)} ${r2(by + ux * hw)}L${r2(bx + uy * hw)} ${r2(by - ux * hw)}Z`
+            };
+        }
+
+        // Scalloped outline: every edge is cut into bumps that bow outward (SVG path, plan units).
+        function cloudPath(c) {
+            const pts = [{ x: c.x, y: c.y }, { x: c.x + c.width, y: c.y }, { x: c.x + c.width, y: c.y + c.height }, { x: c.x, y: c.y + c.height }];
+            const target = Math.min(pageW / 60, Math.min(c.width, c.height) / 3);
+            let d = `M${r2(pts[0].x)} ${r2(pts[0].y)}`;
+            for (let i = 0; i < 4; i++) {
+                const a = pts[i], b = pts[(i + 1) % 4];
+                const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
+                const ux = dx / len, uy = dy / len;
+                const n = Math.max(1, Math.round(len / Math.max(target, 1)));
+                const cl = len / n, h = cl * 0.55;
+                for (let k = 0; k < n; k++) {
+                    const px = a.x + ux * cl * k, py = a.y + uy * cl * k;
+                    const qx = px + ux * cl, qy = py + uy * cl;
+                    const nx = uy, ny = -ux;   // outward for this winding
+                    d += `C${r2(px + nx * h - ux * cl * 0.12)} ${r2(py + ny * h - uy * cl * 0.12)} ${r2(qx + nx * h + ux * cl * 0.12)} ${r2(qy + ny * h + uy * cl * 0.12)} ${r2(qx)} ${r2(qy)}`;
+                }
+            }
+            return d + 'Z';
+        }
+
+        function noteBox(a, measure) {
+            const fs = noteFs(), pad = fs * 0.55, lh = fs * 1.25;
+            const lines = String(a.text).split('\n');
+            const w = Math.max(...lines.map((l) => measure(l, fs))) + pad * 2;
+            return { fs, pad, lh, lines, w, h: lines.length * lh + pad * 2 - (lh - fs) };
+        }
+
+        function drawAnnotation(a, isPreview) {
+            const z = zoomLevel, P = pal(), lw = annLw();
+            annotCtx.save();
+            annotCtx.lineJoin = 'round';
+            annotCtx.lineCap = 'round';
+            if (a.type === 'note') {
+                const m = noteBox(a, (l, fs) => { annotCtx.font = `500 ${fs * z}px "IBM Plex Mono", monospace`; return annotCtx.measureText(l).width / z; });
+                annotCtx.font = `500 ${m.fs * z}px "IBM Plex Mono", monospace`;
+                annotCtx.fillStyle = P.ochreWash;
+                annotCtx.strokeStyle = P.ochre;
+                annotCtx.lineWidth = Math.max(1, lw * 0.6 * z);
+                annotCtx.fillRect(a.x * z, a.y * z, m.w * z, m.h * z);
+                annotCtx.strokeRect(a.x * z, a.y * z, m.w * z, m.h * z);
+                annotCtx.fillStyle = P.inkBlack;
+                annotCtx.textBaseline = 'alphabetic';
+                m.lines.forEach((l, i) => annotCtx.fillText(l, (a.x + m.pad) * z, (a.y + m.pad + m.fs * 0.85 + i * m.lh) * z));
+            } else {
+                annotCtx.scale(z, z);
+                const paths = a.type === 'arrow' ? arrowPaths(a) : null;
+                const cloud = a.type === 'cloud' && a.width > 0 && a.height > 0 ? new Path2D(cloudPath(a)) : null;
+                const color = isPreview ? P.ochre : (a.type === 'arrow' ? P.inkBlack : P.red);
+                // pale halo underneath keeps the line readable on dark plans and photos
+                annotCtx.strokeStyle = withAlpha(P.sheet, 0.9);
+                annotCtx.lineWidth = lw * 2.8;
+                if (paths) { annotCtx.stroke(new Path2D(paths.line)); annotCtx.stroke(new Path2D(paths.head)); }
+                if (cloud) annotCtx.stroke(cloud);
+                annotCtx.strokeStyle = color;
+                annotCtx.fillStyle = color;
+                annotCtx.lineWidth = lw;
+                if (paths) { annotCtx.stroke(new Path2D(paths.line)); annotCtx.fill(new Path2D(paths.head)); annotCtx.stroke(new Path2D(paths.head)); }
+                if (cloud) annotCtx.stroke(cloud);
+            }
+            annotCtx.restore();
+        }
+
+        function openNoteModal(id, pos) {
+            const existing = id ? annotations.find((a) => a.id === id) : null;
+            pendingNote = existing ? { id, x: existing.x, y: existing.y } : { id: null, x: pos.x, y: pos.y };
+            document.getElementById('note-modal-title').textContent = existing ? 'Edit text note' : 'Text note';
+            const input = document.getElementById('note-text-input');
+            input.value = existing ? existing.text : '';
+            document.getElementById('note-modal').classList.add('active');
+            input.focus();
+        }
+        function confirmNote() {
+            const text = document.getElementById('note-text-input').value.replace(/\s+$/, '');
+            document.getElementById('note-modal').classList.remove('active');
+            if (pendingNote && text.trim()) {
+                const existing = pendingNote.id ? annotations.find((a) => a.id === pendingNote.id) : null;
+                if (existing) existing.text = text;
+                else annotations.push({ id: nextAnnotId++, type: 'note', x: pendingNote.x, y: pendingNote.y, text });
+                markupChanged();
+            }
+            pendingNote = null;
+        }
+        function cancelNote() {
+            pendingNote = null;
+            document.getElementById('note-modal').classList.remove('active');
+        }
+        document.getElementById('note-text-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confirmNote(); }
+            if (e.key === 'Escape') cancelNote();
+        });
+
+        function deleteAnnotation(id) {
+            annotations = annotations.filter((a) => a.id !== id);
+            markupChanged();
+        }
+        function clearAnnotations() {
+            if (!annotations.length) return;
+            if (!confirm(`Remove all ${annotations.length} markup items (notes, arrows, clouds)?`)) return;
+            annotations = [];
+            markupChanged();
+        }
+        function markupChanged() {
+            updateMarkupList();
+            redrawAnnotations();
+            scheduleAutosave();
+        }
+        function updateMarkupList() {
+            const kind = { note: 'Note', arrow: 'Arrow', cloud: 'Cloud' };
+            document.getElementById('markup-count').textContent = annotations.length ? `(${annotations.length})` : '';
+            document.getElementById('markup-list').innerHTML = annotations.map((a) => `
+                <div class="region-item markup-item ${a.type}">
+                    <span class="region-label"><span class="markup-kind">${kind[a.type]}</span>${a.type === 'note' ? escapeHtml(a.text.split('\n')[0]) : ''}</span>
+                    <span class="markup-actions">
+                        ${a.type === 'note' ? `<button class="btn btn-sm" onclick="openNoteModal(${a.id})">Edit</button>` : ''}
+                        <button class="btn btn-danger btn-sm" onclick="deleteAnnotation(${a.id})">Delete</button>
+                    </span>
+                </div>
+            `).join('') + (annotations.length > 1 ? '<button class="btn btn-sm" style="margin-top:4px" onclick="clearAnnotations()">Clear all markup</button>' : '')
+                || '<p class="empty-note">None yet. Use the note, arrow or cloud tool on the plan.</p>';
+        }
+
         function setTool(tool) {
             currentTool = currentTool === tool ? null : tool;
             currentRegion = null;
+            currentAnn = null;
             isDrawing = false;
             annotationCanvas.style.cursor = currentTool === 'pan' ? 'grab' : currentTool ? 'crosshair' : 'default';
             container.classList.toggle('tool-active', !!currentTool);
-            ['pan', 'polyline', 'box'].forEach((t) => document.getElementById(t + '-btn').classList.toggle('active', currentTool === t));
+            ['pan', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').classList.toggle('active', currentTool === t));
             redrawAnnotations();
         }
-        ['pan', 'polyline', 'box'].forEach((t) => document.getElementById(t + '-btn').addEventListener('click', () => setTool(t)));
+        ['pan', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').addEventListener('click', () => setTool(t)));
 
         document.getElementById('clear-regions-btn').addEventListener('click', () => {
             regions = [];
@@ -748,6 +922,12 @@
             } else if (currentTool === 'box') {
                 currentRegion = { type: 'box', x: p.x, y: p.y, width: 0, height: 0 };
                 isDrawing = true;
+            } else if (currentTool === 'note') {
+                openNoteModal(null, p);
+            } else if (currentTool === 'arrow') {
+                currentAnn = { type: 'arrow', x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+            } else if (currentTool === 'cloud') {
+                currentAnn = { type: 'cloud', x: p.x, y: p.y, width: 0, height: 0, ox: p.x, oy: p.y };
             }
         });
 
@@ -755,6 +935,14 @@
             if (panState) {
                 wrapper.scrollLeft = panState.sl - (e.clientX - panState.x);
                 wrapper.scrollTop = panState.st - (e.clientY - panState.y);
+            } else if (currentAnn) {
+                const p = toPlan(e);
+                if (currentAnn.type === 'arrow') { currentAnn.x2 = p.x; currentAnn.y2 = p.y; }
+                else {
+                    currentAnn.x = Math.min(currentAnn.ox, p.x); currentAnn.y = Math.min(currentAnn.oy, p.y);
+                    currentAnn.width = Math.abs(p.x - currentAnn.ox); currentAnn.height = Math.abs(p.y - currentAnn.oy);
+                }
+                redrawAnnotations();
             } else if (currentTool === 'box' && isDrawing) {
                 const p = toPlan(e);
                 currentRegion.width = p.x - currentRegion.x;
@@ -767,6 +955,16 @@
             if (panState) {
                 panState = null;
                 annotationCanvas.style.cursor = 'grab';
+            } else if (currentAnn) {
+                const a = currentAnn;
+                currentAnn = null;
+                const min = 8 / zoomLevel;
+                if (a.type === 'arrow' ? Math.hypot(a.x2 - a.x1, a.y2 - a.y1) > min : (a.width > min && a.height > min)) {
+                    delete a.ox; delete a.oy;
+                    a.id = nextAnnotId++;
+                    annotations.push(a);
+                    markupChanged();
+                } else redrawAnnotations();
             } else if (currentTool === 'box' && isDrawing) {
                 isDrawing = false;
                 const minSize = 4 / zoomLevel;
@@ -836,6 +1034,7 @@
                 currentRegion = null;
                 updateRegionsList();
                 redrawAnnotations();
+                scheduleAutosave();
             }
             document.getElementById('label-modal').classList.remove('active');
         }
@@ -880,6 +1079,7 @@
             selectedRegionFilters.delete(id);
             updateRegionsList();
             redrawAnnotations();
+            scheduleAutosave();
         }
 
         // ---------- Photos: EXIF ----------
@@ -1325,6 +1525,27 @@
                     page.drawText(text, { x: X(lp.x) + 3, y: Y(lp.y) + 5, size: fs, font, color: textInk });
                 });
 
+                // markup: same shapes as on screen (pale halo, then colour)
+                const sheetRgb = rgb(0.98, 0.973, 0.949), redRgb = rgb(0.718, 0.396, 0.337), inkBlack = rgb(0.141, 0.141, 0.129);
+                const ochreRgb = rgb(0.69, 0.549, 0.333), washRgb = rgb(0.937, 0.894, 0.82);
+                const svgAt = { x: cb.x, y: cb.y + cb.height };
+                const alw = annLw();
+                const stroke = (d, color, w, fill) => page.drawSvgPath(d, { ...svgAt, borderColor: color, borderWidth: w, borderLineCap: PDFLib.LineCapStyle.Round, ...(fill ? { color } : {}) });
+                annotations.forEach((a) => {
+                    if (a.type === 'arrow') {
+                        const ap = arrowPaths(a);
+                        stroke(ap.line, sheetRgb, alw * 2.8); stroke(ap.head, sheetRgb, alw * 2.8);
+                        stroke(ap.line, inkBlack, alw); stroke(ap.head, inkBlack, alw, true);
+                    } else if (a.type === 'cloud') {
+                        const d = cloudPath(a);
+                        stroke(d, sheetRgb, alw * 2.8); stroke(d, redRgb, alw);
+                    } else {
+                        const m = noteBox(a, (l, fs) => font.widthOfTextAtSize(latin(l), fs));
+                        page.drawRectangle({ x: X(a.x), y: Y(a.y + m.h), width: m.w, height: m.h, color: washRgb, borderColor: ochreRgb, borderWidth: alw * 0.6 });
+                        m.lines.forEach((l, i) => page.drawText(latin(l), { x: X(a.x + m.pad), y: Y(a.y + m.pad + m.fs * 0.85 + i * m.lh), size: m.fs, font, color: inkBlack }));
+                    }
+                });
+
                 const placed = photos.filter((p) => p.pos && p.preview);
                 for (const p of placed) {
                     const img = await doc.embedJpg(await jpegBytesFor(p.image, 1600));
@@ -1531,6 +1752,11 @@
                 },
                 settings: { photo_size_percent_of_page_width: photoSizePct },
                 regions: regions.map(regionJson),
+                annotations: annotations.map((a) => (a.type === 'note'
+                    ? { id: a.id, type: 'note', x: round(a.x), y: round(a.y), text: a.text }
+                    : a.type === 'arrow'
+                        ? { id: a.id, type: 'arrow', x1: round(a.x1), y1: round(a.y1), x2: round(a.x2), y2: round(a.y2) }
+                        : { id: a.id, type: 'cloud', x: round(a.x), y: round(a.y), width: round(a.width), height: round(a.height) })),
                 import_batches: importBatches.map((b) => ({ batch: b.batch, imported_at: iso(b.imported_at), source: b.source, photo_count: b.photo_count })),
                 photos: photos.map((p) => {
                     const r = regionOf(p);
@@ -1571,6 +1797,10 @@
                 ? { id: r.id, label: r.label, type: 'box', x: r.x, y: r.y, width: r.width, height: r.height }
                 : { id: r.id, label: r.label, type: 'polyline', closed: r.closed !== false, points: (r.points || []).map((pt) => ({ x: pt.x, y: pt.y })) }));
             nextRegionId = regions.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+            annotations = (json.annotations || []).filter((a) => ['note', 'arrow', 'cloud'].includes(a.type)).map((a, i) => ({ ...a, id: Number.isInteger(a.id) ? a.id : i + 1 }));
+            nextAnnotId = annotations.reduce((m, a) => Math.max(m, a.id), 0) + 1;
+            currentAnn = null;
+            updateMarkupList();
             selectedRegionFilters.clear();
             setPhotoSize(json.settings && json.settings.photo_size_percent_of_page_width ? json.settings.photo_size_percent_of_page_width : 5, false);
             importBatches = (json.import_batches || []).map((b) => ({ batch: b.batch, imported_at: fromIso(b.imported_at), source: b.source, photo_count: b.photo_count }));
@@ -1871,11 +2101,13 @@
             modal.addEventListener('click', (e) => {
                 if (e.target !== modal) return;
                 if (modal.id === 'label-modal') cancelRegionLabel();
+                else if (modal.id === 'note-modal') cancelNote();
                 else modal.classList.remove('active');
             });
         });
 
         updateRegionsList();
+        updateMarkupList();
         offerResume();
         // canvas text needs the self-hosted fonts; redraw once they are ready
         if (document.fonts && document.fonts.ready) document.fonts.load('500 11px "IBM Plex Mono"').then(() => redrawAnnotations());

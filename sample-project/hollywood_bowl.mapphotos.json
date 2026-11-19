@@ -1,0 +1,166 @@
+{
+  "format": "mapphotos-project",
+  "version": 1,
+  "name": "hollywood_bowl_site_plan",
+  "saved_at": "2026-11-19T12:00:00.000Z",
+  "coordinate_units": "Plan units: PDF points at 100% zoom, origin at the top-left of the page, y increases downward.",
+  "plan": {
+    "file_name": "hollywood_bowl_site_plan.pdf",
+    "path": "hollywood_bowl_site_plan.pdf",
+    "size_bytes": null,
+    "modified": null,
+    "page": 1,
+    "page_width": 955,
+    "page_height": 887
+  },
+  "settings": {
+    "photo_size_percent_of_page_width": 6
+  },
+  "regions": [
+    {
+      "id": 1,
+      "label": "Seating Bowl",
+      "type": "polyline",
+      "closed": true,
+      "points": [
+        {
+          "x": 112,
+          "y": 350
+        },
+        {
+          "x": 150,
+          "y": 262
+        },
+        {
+          "x": 260,
+          "y": 205
+        },
+        {
+          "x": 385,
+          "y": 195
+        },
+        {
+          "x": 385,
+          "y": 300
+        },
+        {
+          "x": 365,
+          "y": 420
+        },
+        {
+          "x": 300,
+          "y": 472
+        },
+        {
+          "x": 200,
+          "y": 482
+        },
+        {
+          "x": 130,
+          "y": 425
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Band Shell and Stage",
+      "type": "box",
+      "x": 255,
+      "y": 140,
+      "width": 175,
+      "height": 85
+    },
+    {
+      "id": 3,
+      "label": "Museum and Terrace",
+      "type": "box",
+      "x": 590,
+      "y": 380,
+      "width": 115,
+      "height": 105
+    },
+    {
+      "id": 4,
+      "label": "Picnic Area 6",
+      "type": "polyline",
+      "closed": true,
+      "points": [
+        {
+          "x": 335,
+          "y": 445
+        },
+        {
+          "x": 520,
+          "y": 445
+        },
+        {
+          "x": 520,
+          "y": 525
+        },
+        {
+          "x": 390,
+          "y": 510
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Lot B",
+      "type": "box",
+      "x": 440,
+      "y": 530,
+      "width": 240,
+      "height": 230
+    },
+    {
+      "id": 6,
+      "label": "Highland Ave Entrance",
+      "type": "box",
+      "x": 760,
+      "y": 330,
+      "width": 130,
+      "height": 330
+    }
+  ],
+  "annotations": [
+    {
+      "id": 1,
+      "type": "note",
+      "x": 30,
+      "y": 30,
+      "text": "SAMPLE PROJECT\nHollywood Bowl walk-through"
+    },
+    {
+      "id": 2,
+      "type": "arrow",
+      "x1": 120,
+      "y1": 104,
+      "x2": 300,
+      "y2": 165
+    },
+    {
+      "id": 3,
+      "type": "note",
+      "x": 30,
+      "y": 78,
+      "text": "Stage: shell faces south-west"
+    },
+    {
+      "id": 4,
+      "type": "cloud",
+      "x": 455,
+      "y": 545,
+      "width": 205,
+      "height": 95
+    },
+    {
+      "id": 5,
+      "type": "note",
+      "x": 455,
+      "y": 650,
+      "text": "Rev A: Lot B layout\nunder review"
+    }
+  ],
+  "import_batches": [],
+  "photos": []
+}

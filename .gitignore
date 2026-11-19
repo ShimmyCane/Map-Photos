@@ -1,0 +1,5 @@
+# Real project data stays offline
+samples/
+*.mapphotos.json
+# ...except the public Hollywood Bowl sample project
+!sample-project/*.mapphotos.json

@@ -24,6 +24,7 @@ On **Open JSON** the app asks you to choose the folder (or files). Each asset is
 | `plan.page`, `plan.page_width`, `plan.page_height` | Page used (only page 1 so far) and its size in points. |
 | `settings.photo_size_percent_of_page_width` | Size of every photo on the plan (1 to 20). All photos share one size. |
 | `regions[]` | Drawn regions. `type` is `box` (`x`, `y`, `width`, `height`) or `polyline` (`closed`, `points[{x,y}]`). `label` is the name you typed. |
+| `annotations[]` | Markup. `type` is `note` (`x`, `y`, `text`), `arrow` (`x1`, `y1` tail, `x2`, `y2` point) or `cloud` (`x`, `y`, `width`, `height`). Optional; older files without it open fine. |
 | `import_batches[]` | Each time photos were loaded: `batch` number, `imported_at`, `source` (`files` or `folder`), `photo_count`. |
 | `photos[].id` | Stable number for the photo within this project. |
 | `photos[].file_name`, `path` | Original file. HEIC photos keep their `.HEIC` name; they are converted in the page when loaded. |
