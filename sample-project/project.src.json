@@ -1,12 +1,12 @@
 {
   "format": "mapphotos-project",
   "version": 1,
-  "name": "hollywood_bowl_site_plan",
+  "name": "Hollywood Bowl sample",
   "saved_at": "2026-11-19T12:00:00.000Z",
   "coordinate_units": "Plan units: PDF points at 100% zoom, origin at the top-left of the page, y increases downward.",
   "plan": {
-    "file_name": "hollywood_bowl_site_plan.pdf",
-    "path": "hollywood_bowl_site_plan.pdf",
+    "file_name": "hollywood_bowl_site_plan.jpg",
+    "path": "hollywood_bowl_site_plan.jpg",
     "size_bytes": null,
     "modified": null,
     "page": 1,
@@ -19,7 +19,16 @@
   "regions": [
     {
       "id": 1,
-      "label": "Seating Bowl",
+      "label": "Stage",
+      "type": "box",
+      "x": 255,
+      "y": 140,
+      "width": 175,
+      "height": 85
+    },
+    {
+      "id": 2,
+      "label": "Seating",
       "type": "polyline",
       "closed": true,
       "points": [
@@ -62,50 +71,8 @@
       ]
     },
     {
-      "id": 2,
-      "label": "Band Shell and Stage",
-      "type": "box",
-      "x": 255,
-      "y": 140,
-      "width": 175,
-      "height": 85
-    },
-    {
       "id": 3,
-      "label": "Museum and Terrace",
-      "type": "box",
-      "x": 590,
-      "y": 380,
-      "width": 115,
-      "height": 105
-    },
-    {
-      "id": 4,
-      "label": "Picnic Area 6",
-      "type": "polyline",
-      "closed": true,
-      "points": [
-        {
-          "x": 335,
-          "y": 445
-        },
-        {
-          "x": 520,
-          "y": 445
-        },
-        {
-          "x": 520,
-          "y": 525
-        },
-        {
-          "x": 390,
-          "y": 510
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "label": "Lot B",
+      "label": "Parking Lot B",
       "type": "box",
       "x": 440,
       "y": 530,
@@ -113,13 +80,22 @@
       "height": 230
     },
     {
-      "id": 6,
-      "label": "Highland Ave Entrance",
+      "id": 4,
+      "label": "Ticketing",
       "type": "box",
-      "x": 760,
+      "x": 765,
       "y": 330,
       "width": 130,
       "height": 330
+    },
+    {
+      "id": 5,
+      "label": "Museum",
+      "type": "box",
+      "x": 590,
+      "y": 380,
+      "width": 115,
+      "height": 105
     }
   ],
   "annotations": [
@@ -158,7 +134,7 @@
       "type": "note",
       "x": 455,
       "y": 650,
-      "text": "Rev A: Lot B layout\nunder review"
+      "text": "Rev A: Parking Lot B\nlayout under review"
     }
   ],
   "import_batches": [
@@ -184,11 +160,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.55,
-      "placed": true,
-      "position": {
-        "x": 800,
-        "y": 610
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 2,
@@ -204,11 +177,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.68,
-      "placed": true,
-      "position": {
-        "x": 790,
-        "y": 380
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 3,
@@ -224,11 +194,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.59,
-      "placed": true,
-      "position": {
-        "x": 845,
-        "y": 480
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 4,
@@ -244,11 +211,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.09,
-      "placed": true,
-      "position": {
-        "x": 200,
-        "y": 420
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 5,
@@ -264,11 +228,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 0.95,
-      "placed": true,
-      "position": {
-        "x": 255,
-        "y": 250
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 6,
@@ -284,11 +245,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.44,
-      "placed": true,
-      "position": {
-        "x": 320,
-        "y": 330
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 7,
@@ -304,11 +262,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.43,
-      "placed": true,
-      "position": {
-        "x": 250,
-        "y": 515
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 8,
@@ -324,11 +279,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.73,
-      "placed": true,
-      "position": {
-        "x": 500,
-        "y": 215
-      }
+      "placed": false,
+      "position": null
     },
     {
       "id": 9,
@@ -344,11 +296,8 @@
       "gps": null,
       "camera": null,
       "aspect_ratio": 1.28,
-      "placed": true,
-      "position": {
-        "x": 648,
-        "y": 440
-      }
+      "placed": false,
+      "position": null
     }
   ]
 }

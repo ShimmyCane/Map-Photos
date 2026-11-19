@@ -34,7 +34,7 @@ They are listed under **Markup** (Edit a note, Delete, Clear all), are saved in 
 
 ## Sample project
 
-`sample-project/` holds a Hollywood Bowl plan, a project JSON with regions and markup, and a `photos/` folder for your own pictures. Step-by-step instructions are in `sample-project/README.md`.
+The start screen offers **Hollywood Bowl sample**: a plan, five regions, some markup and nine photos waiting in the right panel. It is also a single self-contained file, `sample-project/hollywood_bowl.sample.json`, that **Open JSON** accepts (the plan image and photos are embedded in it, so no linking). Step-by-step instructions are in `sample-project/README.md`. Rebuild it with `python3 sample-project/build_sample.py`.
 
 ## Downloading the photos
 

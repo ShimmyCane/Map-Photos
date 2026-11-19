@@ -9,6 +9,7 @@
     <script src="libs/pdf-lib.min.js"></script>
     <script src="libs/heic2any.min.js"></script>
     <script src="libs/jszip.min.js"></script>
+    <script src="sample-project/hollywood_bowl.sample.js"></script>  <!-- optional: lets the start screen offer the sample project -->
     <style>
         /* Map Photos: app-specific layout on top of the Archive / Draft system */
         :root { --inspector-width: 300px; }
@@ -83,6 +84,8 @@
         #empty-hint .hint-sub { color: var(--pencil); margin-top: 6px; }
         #resume-box { display: none; margin-top: 22px; pointer-events: auto; }
         #resume-box .btn { margin: 0 3px; }
+        #sample-box { display: none; margin-top: 22px; pointer-events: auto; }
+        #sample-box .label { display: block; margin-bottom: 8px; color: var(--pencil); }
 
         /* Photos on the plan */
         #marker-layer { position: absolute; inset: 0; pointer-events: none; }
@@ -423,6 +426,9 @@
                         <div>
                             <div class="hint-title">Load a PDF site plan to begin</div>
                             <div class="label hint-sub">Sheet 01 &middot; no drawing loaded</div>
+                            <div id="sample-box">
+                                <span class="label">Sample project</span>
+                            </div>
                             <div id="resume-box">
                                 <button class="btn btn-primary" id="resume-btn"></button>
                                 <button class="btn" id="discard-btn" title="Delete the copy saved in this browser">Discard</button>
@@ -1977,6 +1983,61 @@
             startLink('relink', assets, null);
         });
 
+        // Self-contained project: the plan (PDF or JPG/PNG) and the photos travel inside the JSON as data URIs.
+        function dataUriToBlob(uri) {
+            const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(uri || '');
+            if (!m) throw new Error('bad embedded file');
+            const bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new Blob([bytes], { type: m[1] || 'application/octet-stream' });
+        }
+
+        async function planBytesFromEmbedded(uri) {
+            const blob = dataUriToBlob(uri);
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            if (blob.type === 'application/pdf') return bytes;
+            // an image background becomes a one-page PDF the size of the image (1 px = 1 pt)
+            const doc = await PDFLib.PDFDocument.create();
+            const img = blob.type === 'image/png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+            const page = doc.addPage([img.width, img.height]);
+            page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            return await doc.save();
+        }
+
+        async function openEmbeddedProject(json) {
+            showToast('Opening project…');
+            const planBytes = await planBytesFromEmbedded(json.embedded.plan);
+            const sources = (json.photos || []).map((jp, i) => {
+                const uri = (json.embedded.photos || [])[i];
+                return uri ? { image: dataUriToBlob(uri) } : null;
+            });
+            await applyProject(json, planBytes, planFromJson(json), sources);
+            scheduleAutosave();   // keep a copy in this browser so "Resume" offers it next time
+            showToast('Project opened');
+        }
+
+        // Sample projects shipped with the app (sample-project/*.sample.js)
+        (function offerSamples() {
+            const list = window.MAPPHOTOS_SAMPLES || [];
+            if (!list.length) return;
+            const box = document.getElementById('sample-box');
+            list.forEach((sample) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-primary';
+                btn.innerHTML = '<svg class="icon"><use href="#i-images"/></svg><span></span>';
+                const n = (sample.photos || []).length;
+                btn.querySelector('span').textContent = `${sample.name} (${(sample.regions || []).length} regions, ${n} photos)`;
+                btn.onclick = async () => {
+                    btn.disabled = true;
+                    try { await openEmbeddedProject(sample); } catch (err) { showToast('Could not open the sample: ' + err.message); }
+                    btn.disabled = false;
+                };
+                box.appendChild(btn);
+            });
+            box.style.display = 'block';
+        })();
+
         document.getElementById('project-open').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             e.target.value = '';
@@ -1986,6 +2047,7 @@
                 try { json = JSON.parse(await file.text()); } catch (err) { throw new Error('not a Map Photos project file'); }
                 if (!json || json.format !== 'mapphotos-project' || !json.plan) throw new Error('not a Map Photos project file');
                 if (json.version > 1) throw new Error('this project was saved by a newer version of the app');
+                if (json.embedded) { await openEmbeddedProject(json); return; }
                 const assets = [{ key: 'plan', kind: 'plan', path: json.plan.path || json.plan.file_name, name: json.plan.file_name, size: json.plan.size_bytes }];
                 (json.photos || []).forEach((jp, i) => assets.push({ key: 'p' + i, kind: 'photo', path: jp.path || jp.file_name, name: jp.file_name, size: jp.size_bytes }));
                 startLink('open', assets, json);
