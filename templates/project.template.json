@@ -1,0 +1,110 @@
+{
+  "format": "mapphotos-project",
+  "version": 1,
+  "name": "Example Campus Walk",
+  "saved_at": "2026-11-18T21:30:00.000Z",
+  "coordinate_units": "Plan units: PDF points at 100% zoom, origin at the top-left of the page, y increases downward.",
+
+  "plan": {
+    "file_name": "campus_site_plan.pdf",
+    "path": "plans/campus_site_plan.pdf",
+    "size_bytes": 1843200,
+    "modified": "2026-10-02T14:05:00.000Z",
+    "page": 1,
+    "page_width": 2384,
+    "page_height": 1684
+  },
+
+  "settings": {
+    "photo_size_percent_of_page_width": 5
+  },
+
+  "regions": [
+    {
+      "id": 1,
+      "label": "Building A: Admin",
+      "type": "box",
+      "x": 320,
+      "y": 410,
+      "width": 540,
+      "height": 300
+    },
+    {
+      "id": 2,
+      "label": "Building B: Library",
+      "type": "polyline",
+      "closed": true,
+      "points": [
+        { "x": 1200, "y": 300 },
+        { "x": 1650, "y": 300 },
+        { "x": 1650, "y": 720 },
+        { "x": 1320, "y": 720 }
+      ]
+    }
+  ],
+
+  "import_batches": [
+    { "batch": 1, "imported_at": "2026-11-18T20:10:00.000Z", "source": "folder", "photo_count": 2 },
+    { "batch": 2, "imported_at": "2026-11-18T20:42:00.000Z", "source": "files", "photo_count": 1 }
+  ],
+
+  "photos": [
+    {
+      "id": 1,
+      "file_name": "IMG_0101.JPG",
+      "path": "photos/morning/IMG_0101.JPG",
+      "size_bytes": 3412009,
+      "modified": "2026-10-02T09:00:12.000Z",
+      "format": "jpeg",
+      "import_batch": 1,
+      "imported_at": "2026-11-18T20:10:00.000Z",
+      "taken_at": "2026-10-02T09:00:12.000Z",
+      "taken_at_source": "exif",
+      "gps": { "lat": 40.712776, "lon": -74.005974 },
+      "camera": "Apple iPhone 15 Pro",
+      "aspect_ratio": 1.33,
+      "placed": true,
+      "position": { "x": 560, "y": 560 },
+      "region": "Building A: Admin",
+      "region_id": 1
+    },
+    {
+      "id": 2,
+      "file_name": "IMG_0102.HEIC",
+      "path": "photos/morning/IMG_0102.HEIC",
+      "size_bytes": 2105544,
+      "modified": "2026-10-02T09:12:40.000Z",
+      "format": "heic",
+      "import_batch": 1,
+      "imported_at": "2026-11-18T20:10:00.000Z",
+      "taken_at": "2026-10-02T09:12:40.000Z",
+      "taken_at_source": "exif",
+      "gps": null,
+      "camera": "Apple iPhone 15 Pro",
+      "aspect_ratio": 0.75,
+      "placed": true,
+      "position": { "x": 1480, "y": 520 },
+      "region": "Building B: Library",
+      "region_id": 2
+    },
+    {
+      "id": 3,
+      "file_name": "screenshot.png",
+      "path": "screenshot.png",
+      "size_bytes": 88211,
+      "modified": "2026-10-02T11:30:00.000Z",
+      "format": "png",
+      "import_batch": 2,
+      "imported_at": "2026-11-18T20:42:00.000Z",
+      "taken_at": "2026-10-02T11:30:00.000Z",
+      "taken_at_source": "file_date",
+      "gps": null,
+      "camera": null,
+      "aspect_ratio": 1,
+      "placed": false,
+      "position": null,
+      "region": null,
+      "region_id": null
+    }
+  ]
+}

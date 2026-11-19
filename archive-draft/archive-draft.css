@@ -1,0 +1,273 @@
+/* =========================================================
+   ARCHIVE / DRAFT  v1.0
+   Reusable architectural drafting design system.
+   Copy this folder (archive-draft.css, fonts.css, fonts/) into any project,
+   link archive-draft.css, and override only what the site needs.
+   Fonts are self-hosted (fonts.css) so the site works offline.
+   Icons: Lucide, 1.5px stroke (see .icon below).
+   ========================================================= */
+
+@import url("fonts.css");
+
+:root {
+  /* Typography */
+  --font-technical: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --font-editorial: "Newsreader", Georgia, serif;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+
+  /* Paper */
+  --paper: #F3EFE5;
+  --sheet: #FAF8F2;
+  --paper-white: var(--sheet);
+  --tracing: #E6E0D3;
+  --board: #D5CEBF;
+  --kraft: #C4BBAA;
+
+  /* UI surfaces */
+  --panel: #EEEAE1;
+  --panel-hover: #E4DED2;
+  --panel-active: #D9D1C3;
+
+  /* Ink */
+  --ink-black: #242421;
+  --ink: #383833;
+  --graphite: #57564F;
+  --pencil: #858176;
+  --pencil-light: #A6A092;
+  --construction: #C2BBAE;
+
+  /* Technical colours (meaning, not decoration) */
+  --blue: #607D91;        /* existing / reference */
+  --blue-light: #A8BAC5;
+  --teal: #6E8982;        /* verified / measured */
+  --red: #B76556;         /* change / correction */
+  --brick: #97594C;       /* issue / warning */
+  --ochre: #B08C55;       /* attention / highlight */
+  --olive: #858568;       /* landscape / context */
+  --lavender: #8C8695;    /* special classification */
+  --brown: #786352;       /* historic / material */
+
+  /* Tints used for hover/status washes */
+  --brick-wash: #E9DAD3;
+  --teal-wash: #DCE5E1;
+  --blue-wash: #DDE5EA;
+  --ochre-wash: #EFE4D1;
+
+  /* Status */
+  --success: var(--teal);
+  --warning: var(--ochre);
+  --error: var(--red);
+  --info: var(--blue);
+  --disabled: var(--pencil-light);
+
+  /* Borders */
+  --border: #C8C0B1;
+  --border-dark: #8E8779;
+  --border-light: #DDD5C7;
+
+  /* Line weights */
+  --line-hairline: 0.5px;
+  --line-fine: 1px;
+  --line-medium: 1.5px;
+  --line-heavy: 2.5px;
+
+  /* Geometry */
+  --radius: 2px;
+  --radius-lg: 3px;
+
+  /* Spacing (4px modular) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Shadows (minimal) */
+  --shadow-paper: 1px 2px 4px rgba(40, 35, 25, 0.08);
+  --shadow-sheet: 2px 3px 8px rgba(40, 35, 25, 0.10);
+
+  /* App dimensions */
+  --header-height: 42px;
+  --footer-height: 28px;
+  --toolbar-width: 48px;
+  --inspector-width: 260px;
+}
+
+/* ---- Theme presets: same DNA, different personality ---- */
+[data-theme="archive"]      { --paper: #E6E0D3; --ink: #383833; --blue: #786352; }
+[data-theme="survey"]       { --paper: #FAF8F2; --ink: #383833; --blue: #6E8982; }
+[data-theme="workshop"]     { --paper: #D5CEBF; --ink: #242421; --blue: #B08C55; }
+[data-theme="field-notes"]  { --paper: #F3EFE5; --ink: #57564F; --blue: #B76556; }
+[data-theme="presentation"] { --paper: #FAF8F2; --ink: #242421; --blue: #8C8695; }
+
+/* ---- Global ---- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-technical);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.15;
+  margin: 0;
+}
+h1 { font-size: 40px; }
+h2 { font-size: 30px; }
+h3 { font-size: 22px; }
+h4 { font-size: 17px; }
+
+.editorial { font-family: var(--font-editorial); }
+
+.label {
+  font-family: var(--font-technical);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+::selection { background: var(--blue-light); color: var(--ink-black); }
+
+:focus-visible { outline: 1px solid var(--blue); outline-offset: 1px; }
+
+/* ---- Buttons ---- */
+.btn {
+  font-family: var(--font-technical);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.035em;
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: transparent;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.btn:hover { background: var(--panel-hover); }
+.btn:active { background: var(--panel-active); }
+
+.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
+.btn-primary:hover { background: var(--graphite); }
+.btn-primary:active { background: var(--ink-black); }
+
+.btn-quiet { border-color: transparent; }
+
+.btn-danger { color: var(--brick); border-color: var(--brick); }
+.btn-danger:hover { background: var(--brick-wash); }
+
+.btn-selected, .btn.active { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.btn-selected:hover, .btn.active:hover { background: var(--graphite); }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { background: transparent; }
+.btn-primary:disabled:hover { background: var(--ink); }
+
+/* Tool buttons: square, icon only */
+.tool-btn {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--graphite);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.tool-btn:hover { background: var(--panel-hover); border-color: var(--border); }
+.tool-btn.active { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- Icons (Lucide, 1.5px stroke) ---- */
+.icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-sm { width: 14px; height: 14px; }
+
+/* ---- Panels & containers ---- */
+.panel { background: var(--panel); border: 1px solid var(--border); }
+
+.panel-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.card { background: var(--sheet); border: 1px solid var(--border); padding: 16px; }
+.inset { background: var(--tracing); border: 1px solid var(--border); padding: 10px; }
+
+/* ---- Forms ---- */
+.input, .select, .textarea {
+  background: var(--sheet);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  color: var(--ink);
+  font-family: var(--font-technical);
+  font-size: 12px;
+}
+.input:focus, .select:focus, .textarea:focus { outline: 1px solid var(--blue); border-color: var(--blue); }
+
+input[type="checkbox"], input[type="range"] { accent-color: var(--ink); }
+
+/* ---- Navigation ---- */
+.nav-item {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--graphite);
+  border-bottom: 1px solid transparent;
+}
+.nav-item:hover { background: var(--panel-hover); }
+.nav-item.active { color: var(--ink); border-left: 2px solid var(--ink); background: var(--sheet); }
+
+/* ---- Tags / status chips ---- */
+.tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--graphite);
+}
+.tag-blue  { background: var(--blue-wash);  border-color: var(--blue);  color: var(--ink); }
+.tag-teal  { background: var(--teal-wash);  border-color: var(--teal);  color: var(--ink); }
+.tag-brick { background: var(--brick-wash); border-color: var(--brick); color: var(--ink); }
+.tag-ochre { background: var(--ochre-wash); border-color: var(--ochre); color: var(--ink); }
+
+/* ---- Drawing canvas surround (faint drafting grid) ---- */
+.canvas {
+  background-color: var(--sheet);
+  background-image:
+    linear-gradient(rgba(90, 85, 75, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 85, 75, 0.045) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.divider { border: 0; border-top: 1px solid var(--border); }

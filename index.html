@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Photos</title>
+    <link rel="stylesheet" href="archive-draft/archive-draft.css">
+    <script src="libs/pdf.min.js"></script>
+    <script src="libs/pdf-lib.min.js"></script>
+    <script src="libs/heic2any.min.js"></script>
+    <script src="libs/jszip.min.js"></script>
+    <style>
+        /* Map Photos: app-specific layout on top of the Archive / Draft system */
+        :root { --inspector-width: 300px; }
+
+        html, body { height: 100%; }
+        body { overflow: hidden; }
+        .app { display: flex; flex-direction: column; height: 100vh; }
+
+        /* Header: drawing-sheet title block */
+        .app-header {
+            min-height: var(--header-height);
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            flex-wrap: wrap;
+            padding: 5px var(--space-3);
+            background: var(--panel);
+            border-bottom: 1px solid var(--border-dark);
+        }
+        .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+        .brand-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; line-height: 1; }
+        .brand-sub { color: var(--pencil); }
+        .header-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .btn { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
+        .btn-sm { height: 24px; padding: 0 8px; font-size: 10px; }
+        .btn input[type="file"] { display: none; }
+
+        .app-body { flex: 1; display: flex; min-height: 0; }
+
+        /* Tool rail */
+        .tool-rail {
+            width: var(--toolbar-width);
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: var(--space-2) 0;
+            background: var(--panel);
+            border-right: 1px solid var(--border-dark);
+        }
+        .tool-rail .rule { width: 26px; border-top: 1px solid var(--border); margin: 4px 0; }
+
+        /* Drawing board */
+        .pdf-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .pdf-canvas-wrapper {
+            flex: 1;
+            overflow: auto;
+            display: flex;
+            position: relative;
+            background-color: var(--board);
+            background-image:
+                linear-gradient(rgba(90, 85, 75, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(90, 85, 75, 0.07) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .canvas-container { position: relative; flex: none; margin: auto; display: none; }
+        body.has-pdf .canvas-container { display: block; }
+        #pdf-canvas { display: block; background: #fff; box-shadow: var(--shadow-sheet), 0 0 0 1px var(--border-dark); }
+        #annotation-canvas { position: absolute; top: 0; left: 0; display: block; }
+
+        #empty-hint {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            pointer-events: none;
+        }
+        #empty-hint .hint-title { font-family: var(--font-editorial); font-style: italic; font-size: 30px; color: var(--graphite); line-height: 1.2; }
+        #empty-hint .hint-sub { color: var(--pencil); margin-top: 6px; }
+        #resume-box { display: none; margin-top: 22px; pointer-events: auto; }
+        #resume-box .btn { margin: 0 3px; }
+
+        /* Photos on the plan */
+        #marker-layer { position: absolute; inset: 0; pointer-events: none; }
+        .photo-marker {
+            position: absolute;
+            pointer-events: auto;
+            padding: 2px;
+            border: 1px solid var(--ink);
+            border-radius: var(--radius);
+            background: var(--sheet);
+            box-shadow: var(--shadow-paper);
+            cursor: grab;
+            touch-action: none;
+            overflow: hidden;
+        }
+        .photo-marker img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .photo-marker .photo-fallback { background: var(--tracing); }
+        .photo-marker.flash { outline: 2px solid var(--ochre); outline-offset: 2px; }
+        .photo-marker.dragging { cursor: grabbing; z-index: 50; box-shadow: var(--shadow-sheet); }
+        .tool-active .photo-marker { pointer-events: none; }
+
+        /* Hover enlargement */
+        #photo-popup {
+            position: fixed;
+            display: none;
+            z-index: 2500;
+            max-width: 420px;
+            background: var(--sheet);
+            border: 1px solid var(--ink);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sheet);
+            padding: 6px;
+            pointer-events: none;
+        }
+        #photo-popup img { display: block; max-width: 400px; max-height: 360px; }
+        #photo-popup .meta { font-size: 11px; line-height: 1.7; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+        #photo-popup .meta b { font-weight: 600; color: var(--graphite); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+
+        /* Inspector */
+        .sidebar {
+            width: var(--inspector-width);
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            background: var(--panel);
+            border-left: 1px solid var(--border-dark);
+        }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-3) 72px; }
+        .section { margin-bottom: var(--space-5); }
+        .section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-family: var(--font-display);
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding-bottom: 3px;
+            margin-bottom: var(--space-2);
+            border-bottom: 1px solid var(--border-dark);
+        }
+        .section-title span { font-family: var(--font-technical); font-size: 10px; font-weight: 400; color: var(--graphite); letter-spacing: 0.04em; }
+        .empty-note { font-size: 11px; color: var(--pencil); }
+
+        .region-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-2);
+            padding: 5px 6px 5px 8px;
+            margin-bottom: 4px;
+            background: var(--sheet);
+            border: 1px solid var(--border);
+            border-left: 2px solid var(--blue);
+            font-size: 12px;
+        }
+        .region-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .region-filter { display: flex; align-items: center; gap: var(--space-2); padding: 5px 8px; margin-bottom: 2px; font-size: 12px; border: 1px solid transparent; }
+        .region-filter:hover { background: var(--panel-hover); }
+        .region-filter input { width: 15px; height: 15px; cursor: pointer; }
+        .region-filter label { cursor: pointer; flex: 1; }
+
+        .import-actions { display: flex; gap: 6px; margin-bottom: var(--space-2); }
+        .import-actions .btn { flex: 1; }
+        .photo-help { font-family: var(--font-editorial); font-style: italic; font-size: 13px; line-height: 1.4; color: var(--graphite); margin-bottom: var(--space-3); }
+
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 8px; }
+        .photo-card { min-width: 0; cursor: grab; }
+        .photo-thumbnail {
+            aspect-ratio: 1;
+            padding: 3px;
+            overflow: hidden;
+            background: var(--sheet);
+            border: 1px solid var(--border-dark);
+            border-radius: var(--radius);
+        }
+        .photo-card.placed .photo-thumbnail { border-color: var(--blue); box-shadow: 2px 2px 0 var(--blue-light); }
+        .photo-thumbnail img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .photo-fallback {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 6px; font-size: 10px; text-align: center; word-break: break-all; color: var(--graphite); background: var(--tracing);
+        }
+        .photo-info { font-size: 10px; color: var(--graphite); margin-top: 4px; text-align: center; line-height: 1.45; letter-spacing: 0.02em; }
+        .photo-info .guess { font-style: italic; color: var(--ochre); }
+        .photo-info .icon { vertical-align: -2px; color: var(--teal); }
+        .photo-tag {
+            display: block;
+            margin-top: 3px;
+            padding: 1px 6px;
+            border: 1px dashed var(--pencil-light);
+            border-radius: var(--radius);
+            font-size: 10px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--pencil);
+        }
+        .photo-tag.region { border: 1px solid var(--blue); background: var(--blue-wash); color: var(--ink); }
+        .photo-tag.onplan { border: 1px solid var(--border-dark); background: var(--sheet); color: var(--graphite); }
+
+        /* Footer status bar */
+        .app-footer {
+            height: var(--footer-height);
+            flex: none;
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            padding: 0 var(--space-3);
+            background: var(--panel);
+            border-top: 1px solid var(--border-dark);
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--graphite);
+            white-space: nowrap;
+        }
+        .app-footer b { font-weight: 600; color: var(--ink); }
+        #save-status { flex: 1; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0.02em; font-size: 11px; }
+
+        /* Settings button (always bottom-right) */
+        .settings-fab {
+            position: fixed;
+            right: 14px;
+            bottom: calc(var(--footer-height) + 12px);
+            width: 40px;
+            height: 40px;
+            background: var(--sheet);
+            border: 1px solid var(--ink);
+            box-shadow: var(--shadow-paper);
+            color: var(--ink);
+            z-index: 1000;
+        }
+
+        /* Dialogs */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(36, 36, 33, 0.35);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--sheet);
+            border: 1px solid var(--ink);
+            border-radius: var(--radius);
+            padding: var(--space-4) var(--space-5) var(--space-5);
+            width: 400px;
+            max-width: 92vw;
+            box-shadow: var(--shadow-sheet);
+        }
+        .modal-title {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding-bottom: 6px;
+            margin-bottom: var(--space-3);
+            border-bottom: 1px solid var(--ink);
+        }
+        .modal-note { font-size: 11px; color: var(--graphite); margin-bottom: var(--space-3); }
+        .modal-buttons { display: flex; gap: var(--space-2); }
+        .modal-buttons .btn { flex: 1; }
+        .modal-content .input { width: 100%; margin-bottom: var(--space-3); }
+        .stack { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-2); }
+        .setting-row { margin-bottom: var(--space-4); font-size: 12px; }
+        .setting-row > label { display: block; font-weight: 600; margin-bottom: 6px; }
+        .setting-row input[type=range] { width: 100%; }
+        .setting-row .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; margin-top: 10px; }
+        .setting-row .hint { color: var(--graphite); font-size: 11px; }
+
+        /* Settings: corner panel that leaves the plan visible, so photo-size changes can be watched live */
+        #settings-modal { background: transparent; pointer-events: none; align-items: flex-end; justify-content: flex-end; padding: 0 14px calc(var(--footer-height) + 60px) 0; }
+        #settings-modal .modal-content { pointer-events: auto; width: 360px; }
+
+        .link-row { font-size: 11px; padding: 4px 8px; margin-bottom: 2px; border: 1px solid var(--border); word-break: break-all; }
+        .link-row.ok { background: var(--teal-wash); border-color: var(--teal); }
+        .link-row.miss { background: var(--brick-wash); border-color: var(--brick); }
+        #link-list { max-height: 260px; overflow-y: auto; }
+        #save-status .icon { vertical-align: -3px; }
+        #save-status.bad { color: var(--brick); font-weight: 600; }
+        #link-summary { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 10px 0; }
+
+        #toast {
+            position: fixed;
+            left: 50%;
+            bottom: calc(var(--footer-height) + 16px);
+            transform: translateX(-50%);
+            background: var(--ink-black);
+            color: var(--sheet);
+            border: 1px solid var(--ink-black);
+            border-radius: var(--radius);
+            padding: 9px 16px;
+            font-size: 12px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s;
+            z-index: 3000;
+            max-width: 80vw;
+        }
+        #toast.show { opacity: 1; }
+
+        .sidebar-content::-webkit-scrollbar, .pdf-canvas-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
+        .sidebar-content::-webkit-scrollbar-thumb, .pdf-canvas-wrapper::-webkit-scrollbar-thumb { background: var(--construction); border: 2px solid transparent; background-clip: content-box; }
+
+        @media (max-width: 800px) {
+            body { overflow: auto; }
+            .app { height: auto; min-height: 100vh; }
+            .app-body { flex-direction: column; }
+            .tool-rail { width: auto; flex-direction: row; justify-content: flex-start; padding: var(--space-2); border-right: 0; border-bottom: 1px solid var(--border-dark); }
+            .tool-rail .rule { width: 0; height: 26px; border-top: 0; border-left: 1px solid var(--border); margin: 0 4px; }
+            .pdf-panel { height: 60vh; flex: none; }
+            .sidebar { width: auto; border-left: 0; border-top: 1px solid var(--border-dark); }
+        }
+    </style>
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+        <symbol id="i-camera" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" /> <circle cx="12" cy="13" r="3" /></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+        <symbol id="i-file-down" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M12 18v-6" /> <path d="m9 15 3 3 3-3" /></symbol>
+        <symbol id="i-file-up" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M12 12v6" /> <path d="m15 15-3-3-3 3" /></symbol>
+        <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" /></symbol>
+        <symbol id="i-folder-up" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /> <path d="M12 10v6" /> <path d="m9 13 3-3 3 3" /></symbol>
+        <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2" /> <path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2" /> <path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8" /> <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></symbol>
+        <symbol id="i-images" viewBox="0 0 24 24"><path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16" /> <path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" /> <circle cx="13" cy="7" r="1" fill="currentColor" /> <rect x="8" y="2" width="14" height="14" rx="2" /></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></symbol>
+        <symbol id="i-loader-circle" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></symbol>
+        <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></symbol>
+        <symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6" /> <path d="m21 3-7 7" /> <path d="m3 21 7-7" /> <path d="M9 21H3v-6" /></symbol>
+        <symbol id="i-pen-tool" viewBox="0 0 24 24"><path d="m18 13-.654-4.736a4 4 0 00-2.756-3.266l-9.163-2.9a2 2 0 00-2.017.493l-.82.819a2 2 0 00-.492 2.017l2.9 9.163a4 4 0 003.266 2.756L13 18" /> <path d="M18.648 12.352a1.205 1.205 0 011.704 0l1.296 1.296a1.205 1.205 0 010 1.704l-6.296 6.296a1.205 1.205 0 01-1.704 0l-1.296-1.296a1.205 1.205 0 010-1.704z" /> <path d="m3 3 6.586 6.586" /> <circle cx="11" cy="11" r="2" /></symbol>
+        <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /></symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></symbol>
+        <symbol id="i-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></symbol>
+        <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /></symbol>
+        <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+        <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+        <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="11" x2="11" y1="8" y2="14" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
+        <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
+    </defs></svg>  <!-- Lucide icons (ISC licence) -->
+    <div class="app">
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand-title">Map Photos</span>
+                <span class="label brand-sub">Site plan photo log</span>
+            </div>
+            <div class="header-actions">
+                <label class="btn" title="Load a PDF site plan">
+                    <svg class="icon"><use href="#i-file-up"/></svg><span>Load PDF</span>
+                    <input type="file" id="pdf-upload" accept=".pdf,application/pdf">
+                </label>
+                <label class="btn" id="open-label" title="Open a saved project JSON file">
+                    <svg class="icon"><use href="#i-folder-open"/></svg><span>Open JSON</span>
+                    <input type="file" id="project-open" accept=".json,application/json">
+                </label>
+                <button class="btn" id="save-btn" disabled title="Save the project as a JSON file that lists the plan, photos, regions and positions">
+                    <svg class="icon"><use href="#i-save"/></svg><span class="btn-label">Save JSON</span>
+                </button>
+                <button class="btn btn-primary" id="download-btn" disabled title="Download the plan as a PDF with the photos placed on it">
+                    <svg class="icon"><use href="#i-file-down"/></svg><span class="btn-label">Download PDF</span>
+                </button>
+                <button class="btn" id="photos-btn" disabled title="Save every photo on the plan, renamed RegionName_## in time order">
+                    <svg class="icon"><use href="#i-images"/></svg><span class="btn-label">Download photos</span>
+                </button>
+                <button class="btn" id="link-btn" style="display:none" title="Some photos in this project are missing. Point to their files.">
+                    <svg class="icon"><use href="#i-link"/></svg><span>Link files</span>
+                </button>
+                <button class="btn" id="settings-toolbar-btn" title="Settings">
+                    <svg class="icon"><use href="#i-sliders-horizontal"/></svg><span>Settings</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="app-body">
+            <nav class="tool-rail" aria-label="Plan tools">
+                <button class="tool-btn" id="zoom-in-btn" title="Zoom in"><svg class="icon"><use href="#i-zoom-in"/></svg></button>
+                <button class="tool-btn" id="zoom-out-btn" title="Zoom out"><svg class="icon"><use href="#i-zoom-out"/></svg></button>
+                <button class="tool-btn" id="fit-btn" title="Fit to window"><svg class="icon"><use href="#i-maximize-2"/></svg></button>
+                <div class="rule"></div>
+                <button class="tool-btn" id="pan-btn" title="Pan: drag to move the plan"><svg class="icon"><use href="#i-hand"/></svg></button>
+                <button class="tool-btn" id="polyline-btn" title="Polyline region: click points, double-click to close"><svg class="icon"><use href="#i-pen-tool"/></svg></button>
+                <button class="tool-btn" id="box-btn" title="Box region: drag a rectangle"><svg class="icon"><use href="#i-square"/></svg></button>
+                <div class="rule"></div>
+                <button class="tool-btn" id="clear-regions-btn" title="Clear all regions"><svg class="icon"><use href="#i-trash-2"/></svg></button>
+            </nav>
+
+            <main class="pdf-panel">
+                <div class="pdf-canvas-wrapper" id="canvas-wrapper">
+                    <div class="canvas-container" id="canvas-container">
+                        <canvas id="pdf-canvas"></canvas>
+                        <canvas id="annotation-canvas"></canvas>
+                        <div id="marker-layer"></div>
+                    </div>
+                    <div id="empty-hint">
+                        <div>
+                            <div class="hint-title">Load a PDF site plan to begin</div>
+                            <div class="label hint-sub">Sheet 01 &middot; no drawing loaded</div>
+                            <div id="resume-box">
+                                <button class="btn btn-primary" id="resume-btn"></button>
+                                <button class="btn" id="discard-btn" title="Delete the copy saved in this browser">Discard</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <aside class="sidebar">
+                <div class="sidebar-content">
+                    <div class="section">
+                        <div class="section-title">Regions</div>
+                        <div id="regions-list"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Filter by region</div>
+                        <div id="region-filters"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Photos <span id="photo-count"></span></div>
+                        <div class="import-actions">
+                            <label class="btn" title="Load photos (JPG, PNG, HEIC)">
+                                <svg class="icon"><use href="#i-camera"/></svg><span>Load photos</span>
+                                <input type="file" id="photo-upload" accept="image/*,.heic,.heif" multiple>
+                            </label>
+                            <label class="btn" title="Load every photo in a folder">
+                                <svg class="icon"><use href="#i-folder-up"/></svg><span>Folder</span>
+                                <input type="file" id="photo-folder" webkitdirectory multiple>
+                            </label>
+                        </div>
+                        <div class="photo-help">Drag a photo anywhere on the plan. Hover a photo to enlarge it. Double-click a placed photo to take it off the plan.</div>
+                        <div class="photo-grid" id="photo-grid"></div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <footer class="app-footer">
+            <span>Zoom <b id="zoom-label">100%</b></span>
+            <span id="page-info"></span>
+            <span id="save-status"></span>
+        </footer>
+    </div>
+
+    <div id="photo-popup"></div>
+    <div id="toast"></div>
+
+    <button class="tool-btn settings-fab" id="settings-btn" title="Settings"><svg class="icon"><use href="#i-settings"/></svg></button>
+
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-title">Settings</div>
+            <div class="setting-row">
+                <label for="photo-size">Photo size on the plan: <span id="photo-size-label">5</span>% of page width</label>
+                <input type="range" id="photo-size" min="1" max="20" step="0.5" value="5">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px;">
+                    <span class="hint">Applies to every photo, placed or not yet placed. Watch the plan as you slide.</span>
+                    <button class="btn btn-sm" id="photo-size-reset">Reset</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label class="check" style="margin-top:0"><input type="checkbox" id="autosave-toggle" checked> Auto-save to this browser (local cache)</label>
+                <div id="autosave-status" class="hint" style="margin-top:4px;"></div>
+                <div class="stack">
+                    <button class="btn" id="clear-cache-btn">Clear the browser copy</button>
+                    <button class="btn" id="save-copy-btn">Save JSON as a new file…</button>
+                    <button class="btn" id="save-download-btn">Download JSON (no dialog)</button>
+                    <button class="btn" id="photos-zip-btn">Download renamed photos as a ZIP</button>
+                </div>
+                <label class="check"><input type="checkbox" id="plain-downloads-toggle"> Always use plain browser downloads for Save and Download photos (skip the save/folder dialogs)</label>
+            </div>
+            <p class="modal-note">All data stays on this device. No network access.</p>
+            <div class="modal-buttons">
+                <button class="btn" onclick="closeSettings()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="link-modal">
+        <div class="modal-content" style="width:560px;">
+            <div class="modal-title" id="link-title">Link your files</div>
+            <p class="modal-note" id="link-intro"></p>
+            <div id="link-list"></div>
+            <div id="link-summary"></div>
+            <div class="modal-buttons">
+                <label class="btn">
+                    <svg class="icon"><use href="#i-folder-open"/></svg><span>Choose folder</span>
+                    <input type="file" id="link-folder" webkitdirectory multiple>
+                </label>
+                <label class="btn">
+                    <svg class="icon"><use href="#i-file-up"/></svg><span>Choose files</span>
+                    <input type="file" id="link-files" multiple>
+                </label>
+            </div>
+            <div class="modal-buttons" style="margin-top:8px;">
+                <button class="btn btn-primary confirm" id="link-done">Open project</button>
+                <button class="btn cancel" id="link-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="label-modal">
+        <div class="modal-content">
+            <div class="modal-title">Label this region</div>
+            <input type="text" class="input" id="region-label-input" placeholder="e.g. Building A: Admin">
+            <div class="modal-buttons">
+                <button class="btn btn-primary confirm" onclick="confirmRegionLabel()">Save</button>
+                <button class="btn cancel" onclick="cancelRegionLabel()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+
+        // ---------- State ----------
+        // Regions and photo positions are stored in plan units (PDF points at 100%), so they survive zooming.
+        let pdfDoc = null;
+        let pdfBytes = null;
+        let pdfName = 'plan';
+        let planInfo = null;      // { name, path, size, modified } of the plan file as imported
+        let importBatches = [];   // { batch, imported_at (ms), source, photo_count }
+        let currentPage = 1;
+        let zoomLevel = 1;
+        let pageW = 0, pageH = 0;
+        let renderTask = null;
+        let regions = [];
+        let photos = [];
+        let nextRegionId = 1;
+        let nextPhotoId = 1;
+        let selectedRegionFilters = new Set();
+        let photoSizePct = 5;
+        let currentTool = null;
+        let isDrawing = false;
+        let currentRegion = null;
+        let panState = null;
+        let draggedPhotoId = null;
+
+        const wrapper = document.getElementById('canvas-wrapper');
+        const container = document.getElementById('canvas-container');
+        const pdfCanvas = document.getElementById('pdf-canvas');
+        const annotationCanvas = document.getElementById('annotation-canvas');
+        const markerLayer = document.getElementById('marker-layer');
+        const popup = document.getElementById('photo-popup');
+        const annotCtx = annotationCanvas.getContext('2d');
+        const pdfCtx = pdfCanvas.getContext('2d');
+
+        function showToast(msg, ms = 3500) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            clearTimeout(showToast.timer);
+            showToast.timer = setTimeout(() => t.classList.remove('show'), ms);
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // ---------- PDF ----------
+        document.getElementById('pdf-upload').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+                await openPdfBytes(new Uint8Array(await file.arrayBuffer()), file.name.replace(/\.pdf$/i, ''));
+                planInfo = fileInfo(file);
+                scheduleAutosave();
+            } catch (err) {
+                showToast('Could not open that PDF: ' + err.message);
+            }
+        });
+
+        async function openPdfBytes(bytes, name) {
+            const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
+            pdfBytes = bytes;
+            pdfDoc = doc;
+            pdfName = name;
+            currentPage = 1;
+            const vp = (await pdfDoc.getPage(currentPage)).getViewport({ scale: 1 });
+            pageW = vp.width;
+            pageH = vp.height;
+            document.getElementById('empty-hint').style.display = 'none';
+            document.body.classList.add('has-pdf');
+            document.getElementById('download-btn').disabled = false;
+            document.getElementById('save-btn').disabled = false;
+            await fitToWindow();
+        }
+
+        async function renderPDF() {
+            if (!pdfDoc) return;
+            if (renderTask) renderTask.cancel();
+            const page = await pdfDoc.getPage(currentPage);
+            const viewport = page.getViewport({ scale: zoomLevel });
+            pdfCanvas.width = annotationCanvas.width = Math.round(viewport.width);
+            pdfCanvas.height = annotationCanvas.height = Math.round(viewport.height);
+            const task = page.render({ canvasContext: pdfCtx, viewport });
+            renderTask = task;
+            try { await task.promise; } catch (err) { if (err.name !== 'RenderingCancelledException') throw err; return; }
+            document.getElementById('zoom-label').textContent = Math.round(zoomLevel * 100) + '%';
+            document.getElementById('page-info').textContent = `Page ${currentPage} · ${Math.round(pageW)} × ${Math.round(pageH)} pt`;
+            redrawAnnotations();
+            renderMarkers();
+        }
+
+        async function setZoom(z) {
+            if (!pdfDoc) return;
+            const cx = (wrapper.scrollLeft + wrapper.clientWidth / 2) / (pdfCanvas.width || 1);
+            const cy = (wrapper.scrollTop + wrapper.clientHeight / 2) / (pdfCanvas.height || 1);
+            zoomLevel = Math.min(8, Math.max(0.05, z));
+            await renderPDF();
+            wrapper.scrollLeft = cx * pdfCanvas.width - wrapper.clientWidth / 2;
+            wrapper.scrollTop = cy * pdfCanvas.height - wrapper.clientHeight / 2;
+        }
+
+        async function fitToWindow() {
+            const z = Math.min((wrapper.clientWidth - 40) / pageW, (wrapper.clientHeight - 40) / pageH);
+            await setZoom(z);
+        }
+
+        document.getElementById('zoom-in-btn').addEventListener('click', () => setZoom(zoomLevel * 1.25));
+        document.getElementById('zoom-out-btn').addEventListener('click', () => setZoom(zoomLevel / 1.25));
+        document.getElementById('fit-btn').addEventListener('click', fitToWindow);
+
+        // ---------- Coordinates ----------
+        function toPlan(e) {
+            const r = annotationCanvas.getBoundingClientRect();
+            return {
+                x: ((e.clientX - r.left) * (annotationCanvas.width / r.width)) / zoomLevel,
+                y: ((e.clientY - r.top) * (annotationCanvas.height / r.height)) / zoomLevel
+            };
+        }
+
+        // ---------- Drawing ----------
+        // Canvas colours come from the Archive / Draft tokens so the plan matches the rest of the page.
+        let palette = null;
+        function pal() {
+            if (!palette) {
+                const css = getComputedStyle(document.documentElement);
+                const t = (n) => css.getPropertyValue(n).trim();
+                palette = { blue: t('--blue'), ochre: t('--ochre'), ink: t('--ink'), sheet: t('--sheet') };
+            }
+            return palette;
+        }
+        const withAlpha = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`;
+
+        function drawRegion(region, isPreview) {
+            const z = zoomLevel;
+            const P = pal();
+            annotCtx.strokeStyle = isPreview ? P.ochre : P.blue;
+            annotCtx.lineWidth = 1.5;
+            annotCtx.fillStyle = withAlpha(isPreview ? P.ochre : P.blue, isPreview ? 0.14 : 0.12);
+            annotCtx.setLineDash(isPreview ? [6, 4] : []);
+
+            let labelPt;
+            if (region.type === 'polyline') {
+                annotCtx.beginPath();
+                region.points.forEach((pt, i) => {
+                    if (i === 0) annotCtx.moveTo(pt.x * z, pt.y * z);
+                    else annotCtx.lineTo(pt.x * z, pt.y * z);
+                });
+                if (region.closed) annotCtx.closePath();
+                annotCtx.stroke();
+                if (region.closed) annotCtx.fill();
+                labelPt = { x: region.points[0].x * z, y: region.points[0].y * z };
+            } else {
+                annotCtx.fillRect(region.x * z, region.y * z, region.width * z, region.height * z);
+                annotCtx.strokeRect(region.x * z, region.y * z, region.width * z, region.height * z);
+                labelPt = { x: region.x * z, y: region.y * z };
+            }
+
+            annotCtx.setLineDash([]);
+
+            if (region.label) {
+                annotCtx.font = '500 11px "IBM Plex Mono", monospace';
+                const textWidth = annotCtx.measureText(region.label).width;
+                const pad = 6;
+                const bx = labelPt.x;
+                const by = Math.max(0, labelPt.y - 22);
+                annotCtx.fillStyle = P.sheet;
+                annotCtx.strokeStyle = P.ink;
+                annotCtx.lineWidth = 1;
+                annotCtx.fillRect(bx, by, textWidth + pad * 2, 18);
+                annotCtx.strokeRect(bx + 0.5, by + 0.5, textWidth + pad * 2 - 1, 17);
+                annotCtx.fillStyle = P.ink;
+                annotCtx.fillText(region.label, bx + pad, by + 13);
+            }
+        }
+
+        function redrawAnnotations() {
+            annotCtx.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+            regions.forEach((r) => drawRegion(r, false));
+            if (currentRegion && (currentRegion.type === 'box' || currentRegion.points.length > 0)) {
+                drawRegion(currentRegion, true);
+                if (currentRegion.type === 'polyline') {
+                    annotCtx.fillStyle = pal().ochre;
+                    currentRegion.points.forEach((pt) => {
+                        annotCtx.beginPath();
+                        annotCtx.arc(pt.x * zoomLevel, pt.y * zoomLevel, 4, 0, Math.PI * 2);
+                        annotCtx.fill();
+                    });
+                }
+            }
+        }
+
+        function setTool(tool) {
+            currentTool = currentTool === tool ? null : tool;
+            currentRegion = null;
+            isDrawing = false;
+            annotationCanvas.style.cursor = currentTool === 'pan' ? 'grab' : currentTool ? 'crosshair' : 'default';
+            container.classList.toggle('tool-active', !!currentTool);
+            ['pan', 'polyline', 'box'].forEach((t) => document.getElementById(t + '-btn').classList.toggle('active', currentTool === t));
+            redrawAnnotations();
+        }
+        ['pan', 'polyline', 'box'].forEach((t) => document.getElementById(t + '-btn').addEventListener('click', () => setTool(t)));
+
+        document.getElementById('clear-regions-btn').addEventListener('click', () => {
+            regions = [];
+            selectedRegionFilters.clear();
+            updateRegionsList();
+            redrawAnnotations();
+        });
+
+        annotationCanvas.addEventListener('mousedown', (e) => {
+            if (!currentTool) return;
+            const p = toPlan(e);
+            if (currentTool === 'pan') {
+                panState = { x: e.clientX, y: e.clientY, sl: wrapper.scrollLeft, st: wrapper.scrollTop };
+                annotationCanvas.style.cursor = 'grabbing';
+            } else if (currentTool === 'polyline') {
+                if (!currentRegion) currentRegion = { type: 'polyline', points: [p], closed: false };
+                else currentRegion.points.push(p);
+                redrawAnnotations();
+            } else if (currentTool === 'box') {
+                currentRegion = { type: 'box', x: p.x, y: p.y, width: 0, height: 0 };
+                isDrawing = true;
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (panState) {
+                wrapper.scrollLeft = panState.sl - (e.clientX - panState.x);
+                wrapper.scrollTop = panState.st - (e.clientY - panState.y);
+            } else if (currentTool === 'box' && isDrawing) {
+                const p = toPlan(e);
+                currentRegion.width = p.x - currentRegion.x;
+                currentRegion.height = p.y - currentRegion.y;
+                redrawAnnotations();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (panState) {
+                panState = null;
+                annotationCanvas.style.cursor = 'grab';
+            } else if (currentTool === 'box' && isDrawing) {
+                isDrawing = false;
+                const minSize = 4 / zoomLevel;
+                if (currentRegion && Math.abs(currentRegion.width) > minSize && Math.abs(currentRegion.height) > minSize) {
+                    if (currentRegion.width < 0) { currentRegion.x += currentRegion.width; currentRegion.width = -currentRegion.width; }
+                    if (currentRegion.height < 0) { currentRegion.y += currentRegion.height; currentRegion.height = -currentRegion.height; }
+                    openLabelModal();
+                } else {
+                    currentRegion = null;
+                    redrawAnnotations();
+                }
+            }
+        });
+
+        annotationCanvas.addEventListener('dblclick', () => {
+            if (currentTool === 'polyline' && currentRegion) {
+                // the two clicks of a double-click each added a point; drop the duplicate
+                const pts = currentRegion.points;
+                while (pts.length > 1) {
+                    const a = pts[pts.length - 1], b = pts[pts.length - 2];
+                    if (Math.hypot(a.x - b.x, a.y - b.y) * zoomLevel >= 6) break;
+                    pts.pop();
+                }
+                if (pts.length > 2) {
+                    currentRegion.closed = true;
+                    openLabelModal();
+                }
+            }
+        });
+
+        // ---------- Regions ----------
+        function pointInPolygon(x, y, pts) {
+            let inside = false;
+            for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+                const a = pts[i], b = pts[j];
+                if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+            }
+            return inside;
+        }
+
+        function regionContains(region, x, y) {
+            if (region.type === 'box') {
+                return x >= region.x && x <= region.x + region.width && y >= region.y && y <= region.y + region.height;
+            }
+            return pointInPolygon(x, y, region.points);
+        }
+
+        function regionOf(photo) {
+            if (!photo.pos) return null;
+            const hits = regions.filter((r) => regionContains(r, photo.pos.x, photo.pos.y));
+            return hits.length ? hits[hits.length - 1] : null;
+        }
+
+        function openLabelModal() {
+            const input = document.getElementById('region-label-input');
+            input.value = '';
+            document.getElementById('label-modal').classList.add('active');
+            input.focus();
+        }
+
+        function confirmRegionLabel() {
+            const label = document.getElementById('region-label-input').value.trim() || 'Region';
+            if (currentRegion) {
+                currentRegion.id = nextRegionId++;
+                currentRegion.label = label;
+                regions.push(currentRegion);
+                currentRegion = null;
+                updateRegionsList();
+                redrawAnnotations();
+            }
+            document.getElementById('label-modal').classList.remove('active');
+        }
+
+        function cancelRegionLabel() {
+            currentRegion = null;
+            document.getElementById('label-modal').classList.remove('active');
+            redrawAnnotations();
+        }
+
+        document.getElementById('region-label-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') confirmRegionLabel();
+            if (e.key === 'Escape') cancelRegionLabel();
+        });
+
+        function updateRegionsList() {
+            document.getElementById('regions-list').innerHTML = regions.map((r) => `
+                <div class="region-item">
+                    <span class="region-label">${escapeHtml(r.label)}</span>
+                    <button class="btn btn-danger btn-sm region-delete" onclick="deleteRegion(${r.id})">Delete</button>
+                </div>
+            `).join('') || '<p class="empty-note">None yet. Use the polyline or box tool on the plan.</p>';
+
+            const filters = document.getElementById('region-filters');
+            filters.innerHTML = regions.map((r) => `
+                <div class="region-filter">
+                    <input type="checkbox" id="filter-${r.id}" ${selectedRegionFilters.has(r.id) ? 'checked' : ''} onchange="toggleRegionFilter(${r.id})">
+                    <label for="filter-${r.id}">${escapeHtml(r.label)}</label>
+                </div>
+            `).join('') || '<p class="empty-note">No regions yet</p>';
+            updatePhotoGrid();
+        }
+
+        function toggleRegionFilter(id) {
+            if (document.getElementById(`filter-${id}`).checked) selectedRegionFilters.add(id);
+            else selectedRegionFilters.delete(id);
+            updatePhotoGrid();
+        }
+
+        function deleteRegion(id) {
+            regions = regions.filter((r) => r.id !== id);
+            selectedRegionFilters.delete(id);
+            updateRegionsList();
+            redrawAnnotations();
+        }
+
+        // ---------- Photos: EXIF ----------
+        // Returns the offset of the TIFF header holding the EXIF data (JPEG APP1 or HEIC Exif item), or -1.
+        function findTiffOffset(v) {
+            if (v.getUint16(0) === 0xFFD8) {
+                let off = 2;
+                while (off + 4 < v.byteLength) {
+                    const marker = v.getUint16(off);
+                    const len = v.getUint16(off + 2);
+                    if (marker === 0xFFE1 && v.getUint32(off + 4) === 0x45786966) return off + 10 + 8 < v.byteLength ? off + 10 : -1;
+                    if ((marker & 0xFF00) !== 0xFF00) return -1;
+                    off += 2 + len;
+                }
+                return -1;
+            }
+            if (v.getUint32(4) === 0x66747970) {
+                for (let i = 0; i + 14 < v.byteLength; i++) {
+                    if (v.getUint32(i) === 0x45786966 && v.getUint16(i + 4) === 0) {
+                        const t = v.getUint32(i + 6);
+                        if (t === 0x49492A00 || t === 0x4D4D002A) return i + 6;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        function readExif(buffer) {
+            const out = { timestamp: null, gps: null, camera: null };
+            try {
+                const v = new DataView(buffer);
+                const tiff = findTiffOffset(v);
+                if (tiff < 0) return out;
+                const le = v.getUint16(tiff) === 0x4949;
+                const u16 = (o) => v.getUint16(o, le);
+                const u32 = (o) => v.getUint32(o, le);
+                const str = (o, n) => { let s = ''; for (let i = 0; i < n; i++) { const c = v.getUint8(o + i); if (!c) break; s += String.fromCharCode(c); } return s.trim(); };
+                const readIfd = (ptr) => {
+                    const tags = {};
+                    const base = tiff + ptr;
+                    const n = u16(base);
+                    for (let i = 0; i < n; i++) {
+                        const e = base + 2 + i * 12;
+                        const tag = u16(e), type = u16(e + 2), count = u32(e + 4);
+                        const size = ({ 1: 1, 2: 1, 3: 2, 4: 4, 5: 8 }[type] || 1) * count;
+                        tags[tag] = { type, count, valOff: size > 4 ? tiff + u32(e + 8) : e + 8 };
+                    }
+                    return tags;
+                };
+                const rat = (o) => u32(o) / (u32(o + 4) || 1);
+                const parseDate = (t) => {
+                    const m = t && str(t.valOff, t.count).match(/(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+                    return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
+                };
+                const ifd0 = readIfd(u32(tiff + 4));
+                const make = ifd0[0x010F] ? str(ifd0[0x010F].valOff, ifd0[0x010F].count) : '';
+                const model = ifd0[0x0110] ? str(ifd0[0x0110].valOff, ifd0[0x0110].count) : '';
+                if (make || model) out.camera = model.toLowerCase().startsWith(make.toLowerCase()) ? model : `${make} ${model}`.trim();
+                if (ifd0[0x8769]) {
+                    const exif = readIfd(u32(ifd0[0x8769].valOff));
+                    out.timestamp = parseDate(exif[0x9003]) || parseDate(exif[0x9004]);
+                }
+                if (!out.timestamp) out.timestamp = parseDate(ifd0[0x0132]);
+                if (ifd0[0x8825]) {
+                    const g = readIfd(u32(ifd0[0x8825].valOff));
+                    if (g[2] && g[4]) {
+                        const dms = (t) => rat(t.valOff) + rat(t.valOff + 8) / 60 + rat(t.valOff + 16) / 3600;
+                        let lat = dms(g[2]), lon = dms(g[4]);
+                        if (g[1] && String.fromCharCode(v.getUint8(g[1].valOff)) === 'S') lat = -lat;
+                        if (g[3] && String.fromCharCode(v.getUint8(g[3].valOff)) === 'W') lon = -lon;
+                        out.gps = { lat, lon };
+                    }
+                }
+            } catch (err) { /* no usable EXIF */ }
+            return out;
+        }
+
+        async function scaledJpegUrl(bmp, maxSide, quality) {
+            const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(bmp.width * scale));
+            c.height = Math.max(1, Math.round(bmp.height * scale));
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.drawImage(bmp, 0, 0, c.width, c.height);
+            const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', quality));
+            return URL.createObjectURL(blob);
+        }
+
+        async function deriveImages(blob) {
+            try {
+                const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+                const out = {
+                    aspect: bmp.width / bmp.height,
+                    thumb: await scaledJpegUrl(bmp, 240, 0.8),
+                    preview: await scaledJpegUrl(bmp, 900, 0.85)
+                };
+                bmp.close();
+                return out;
+            } catch (err) {
+                return { aspect: 1, thumb: null, preview: null };
+            }
+        }
+
+        function isHeic(file, head) {
+            if (/\.(heic|heif)$/i.test(file.name) || /image\/hei[cf]/i.test(file.type)) return true;
+            const brand = String.fromCharCode(...head.slice(8, 12));
+            return String.fromCharCode(...head.slice(4, 8)) === 'ftyp' && ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis'].includes(brand);
+        }
+
+        // Browsers hide real disk paths. A folder import gives a relative path; otherwise only the file name is known.
+        function fileInfo(file) {
+            return { name: file.name, path: file.webkitRelativePath || file.name, size: file.size, modified: file.lastModified };
+        }
+
+        function photoFormat(file, heic) {
+            if (heic) return 'heic';
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            return (file.type.split('/')[1] || ext || 'unknown').replace('jpg', 'jpeg');
+        }
+
+        // The returned blob is what we display and export: the original, or a JPEG converted from HEIC.
+        async function loadPhotoFile(file) {
+            const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+            const heic = isHeic(file, head);
+            let exif = { timestamp: null, gps: null, camera: null };
+            try { exif = readExif(await (heic ? file : file.slice(0, 262144)).arrayBuffer()); } catch (err) { /* ignore */ }
+            let image = file;
+            let converted = true;
+            if (heic) {
+                try {
+                    const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+                    image = Array.isArray(out) ? out[0] : out;
+                } catch (err) { converted = false; }
+            }
+            const d = await deriveImages(image);
+            return {
+                ok: converted && !!d.thumb,
+                photo: {
+                    id: nextPhotoId++,
+                    ...fileInfo(file),
+                    format: photoFormat(file, heic),
+                    batch: null,
+                    importedAt: Date.now(),
+                    image,
+                    ...d,
+                    timestamp: exif.timestamp || file.lastModified,
+                    timeFromExif: !!exif.timestamp,
+                    gps: exif.gps,
+                    camera: exif.camera,
+                    pos: null,
+                    missing: false
+                }
+            };
+        }
+
+        async function importPhotos(files, source) {
+            if (!files.length) return;
+            const batch = { batch: importBatches.length + 1, imported_at: Date.now(), source, photo_count: files.length };
+            importBatches.push(batch);
+            let failed = 0;
+            for (let i = 0; i < files.length; i++) {
+                if (isHeic(files[i], new Uint8Array(await files[i].slice(0, 16).arrayBuffer()))) showToast(`Converting HEIC photo ${i + 1} of ${files.length}…`);
+                const { ok, photo } = await loadPhotoFile(files[i]);
+                if (!ok) failed++;
+                photo.batch = batch.batch;
+                photo.importedAt = batch.imported_at;
+                photos.push(photo);
+                updatePhotoGrid();
+            }
+            if (failed) showToast(`${failed} photo(s) could not be previewed or converted`);
+        }
+
+        document.getElementById('photo-upload').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            e.target.value = '';
+            await importPhotos(files, 'files');
+        });
+
+        document.getElementById('photo-folder').addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files).filter((f) => /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name));
+            e.target.value = '';
+            if (!files.length) return showToast('No photos found in that folder');
+            await importPhotos(files, 'folder');
+        });
+
+        const fmtTime = (ts) => new Date(ts).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+
+        function isShown(p) {
+            if (!selectedRegionFilters.size) return true;
+            const r = regionOf(p);
+            return !!r && selectedRegionFilters.has(r.id);
+        }
+
+        // ---------- Photos: sidebar ----------
+        function updatePhotoGrid() {
+            photos.sort((a, b) => a.timestamp - b.timestamp);
+            document.getElementById('photo-count').textContent = photos.length
+                ? `(${photos.filter((p) => p.pos).length} placed / ${photos.length})` : '';
+
+            const shown = photos.filter(isShown);
+            const grid = document.getElementById('photo-grid');
+
+            if (!shown.length) {
+                grid.innerHTML = photos.length ? '<p class="empty-note" style="grid-column: 1/-1;">No photos in selected regions</p>' : '';
+            } else {
+                grid.innerHTML = shown.map((p) => {
+                    const r = regionOf(p);
+                    const tag = r
+                        ? `<span class="photo-tag region" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</span>`
+                        : p.pos ? '<span class="photo-tag onplan">on plan</span>' : '<span class="photo-tag">not placed</span>';
+                    const body = p.thumb
+                        ? `<img src="${p.thumb}" alt="${escapeHtml(p.name)}">`
+                        : `<div class="photo-fallback"><div>${escapeHtml(p.name)}${p.missing ? '<br><b>file missing</b>' : ''}</div></div>`;
+                    const d = new Date(p.timestamp);
+                    const when = `${d.toLocaleDateString([], { dateStyle: 'medium' })}<br>${d.toLocaleTimeString([], { timeStyle: 'short' })}${p.timeFromExif ? '' : ' <span class="guess" title="No EXIF time; using file date">(file date)</span>'}${p.gps ? ' <svg class="icon icon-sm" role="img" aria-label="Has GPS"><title>Has GPS location</title><use href="#i-map-pin"/></svg>' : ''}`;
+                    return `
+                        <div class="photo-card ${p.pos ? 'placed' : ''}" draggable="true" data-id="${p.id}">
+                            <div class="photo-thumbnail">${body}</div>
+                            <div class="photo-info">${when}</div>
+                            ${tag}
+                        </div>`;
+                }).join('');
+            }
+            renderMarkers();
+            document.getElementById('link-btn').style.display = photos.some((p) => p.missing) ? '' : 'none';
+            updatePhotosButton();
+            scheduleAutosave();
+        }
+
+        const photoGrid = document.getElementById('photo-grid');
+        photoGrid.addEventListener('dragstart', (e) => {
+            const card = e.target.closest('.photo-card');
+            if (!card) return;
+            draggedPhotoId = +card.dataset.id;
+            hidePopup();
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+        });
+        photoGrid.addEventListener('dragend', () => { draggedPhotoId = null; });
+        photoGrid.addEventListener('click', (e) => {
+            const card = e.target.closest('.photo-card');
+            if (!card) return;
+            const p = photos.find((p) => p.id === +card.dataset.id);
+            if (p && p.pos) {
+                wrapper.scrollLeft = p.pos.x * zoomLevel - wrapper.clientWidth / 2;
+                wrapper.scrollTop = p.pos.y * zoomLevel - wrapper.clientHeight / 2;
+                const el = markerLayer.querySelector(`[data-id="${p.id}"]`);
+                if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+            }
+        });
+        photoGrid.addEventListener('mouseover', (e) => {
+            const card = e.target.closest('.photo-card');
+            if (card && !card.contains(e.relatedTarget)) scheduleHover(+card.dataset.id, card);
+        });
+        photoGrid.addEventListener('mouseout', (e) => {
+            const card = e.target.closest('.photo-card');
+            if (card && !card.contains(e.relatedTarget)) hidePopup();
+        });
+
+        // ---------- Photos: placing on the plan ----------
+        container.addEventListener('dragover', (e) => {
+            if (draggedPhotoId === null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        container.addEventListener('drop', (e) => {
+            if (draggedPhotoId === null) return;
+            e.preventDefault();
+            const p = photos.find((p) => p.id === draggedPhotoId);
+            draggedPhotoId = null;
+            if (!p || !pdfDoc) return;
+            const pt = toPlan(e);
+            p.pos = clampToPage(pt);
+            updatePhotoGrid();
+        });
+
+        function clampToPage(pt) {
+            return { x: Math.min(pageW, Math.max(0, pt.x)), y: Math.min(pageH, Math.max(0, pt.y)) };
+        }
+
+        function markerSize(p) {
+            const side = pageW * (photoSizePct / 100);
+            return p.aspect >= 1 ? { w: side, h: side / p.aspect } : { w: side * p.aspect, h: side };
+        }
+
+        function placeMarkerEl(el, p) {
+            const { w, h } = markerSize(p);
+            el.style.width = w * zoomLevel + 'px';
+            el.style.height = h * zoomLevel + 'px';
+            el.style.left = (p.pos.x - w / 2) * zoomLevel + 'px';
+            el.style.top = (p.pos.y - h / 2) * zoomLevel + 'px';
+        }
+
+        function renderMarkers() {
+            markerLayer.innerHTML = '';
+            photos.filter((p) => p.pos && isShown(p)).forEach((p) => {
+                const el = document.createElement('div');
+                el.className = 'photo-marker';
+                el.dataset.id = p.id;
+                el.innerHTML = p.thumb ? `<img src="${p.thumb}" alt="">` : `<div class="photo-fallback">${escapeHtml(p.name)}</div>`;
+                placeMarkerEl(el, p);
+                markerLayer.appendChild(el);
+            });
+        }
+
+        let markerDrag = null;
+        markerLayer.addEventListener('pointerdown', (e) => {
+            const el = e.target.closest('.photo-marker');
+            if (!el || e.button !== 0) return;
+            const p = photos.find((p) => p.id === +el.dataset.id);
+            const start = toPlan(e);
+            markerDrag = { el, p, dx: p.pos.x - start.x, dy: p.pos.y - start.y, moved: false };
+            el.setPointerCapture(e.pointerId);
+            hidePopup();
+        });
+        markerLayer.addEventListener('pointermove', (e) => {
+            if (!markerDrag) return;
+            const pt = toPlan(e);
+            markerDrag.moved = true;
+            markerDrag.el.classList.add('dragging');
+            markerDrag.p.pos = clampToPage({ x: pt.x + markerDrag.dx, y: pt.y + markerDrag.dy });
+            placeMarkerEl(markerDrag.el, markerDrag.p);
+        });
+        const endMarkerDrag = () => {
+            if (!markerDrag) return;
+            const moved = markerDrag.moved;
+            markerDrag = null;
+            if (moved) updatePhotoGrid();
+        };
+        markerLayer.addEventListener('pointerup', endMarkerDrag);
+        markerLayer.addEventListener('pointercancel', endMarkerDrag);
+        markerLayer.addEventListener('dblclick', (e) => {
+            const el = e.target.closest('.photo-marker');
+            if (!el) return;
+            const p = photos.find((p) => p.id === +el.dataset.id);
+            if (p) { p.pos = null; hidePopup(); updatePhotoGrid(); }
+        });
+        markerLayer.addEventListener('mouseover', (e) => {
+            const el = e.target.closest('.photo-marker');
+            if (el && !el.contains(e.relatedTarget) && !markerDrag) scheduleHover(+el.dataset.id, el);
+        });
+        markerLayer.addEventListener('mouseout', (e) => {
+            const el = e.target.closest('.photo-marker');
+            if (el && !el.contains(e.relatedTarget)) hidePopup();
+        });
+
+        // ---------- Hover popup ----------
+        let hoverTimer = null;
+        function scheduleHover(id, anchor) {
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(() => showPopup(id, anchor), 250);
+        }
+
+        function hidePopup() {
+            clearTimeout(hoverTimer);
+            popup.style.display = 'none';
+        }
+
+        function showPopup(id, anchor) {
+            const p = photos.find((p) => p.id === id);
+            if (!p) return;
+            const r = regionOf(p);
+            const rows = [
+                `<b>Taken:</b> ${escapeHtml(fmtTime(p.timestamp))}${p.timeFromExif ? '' : ' <i>(file date, no EXIF time)</i>'}`,
+                p.gps ? `<b>GPS:</b> ${p.gps.lat.toFixed(5)}, ${p.gps.lon.toFixed(5)}` : '',
+                p.camera ? `<b>Camera:</b> ${escapeHtml(p.camera)}` : '',
+                `<b>Region:</b> ${r ? escapeHtml(r.label) : p.pos ? 'none (on plan)' : 'not placed'}`,
+                `<b>File:</b> ${escapeHtml(p.name)}`
+            ].filter(Boolean).join('<br>');
+            const img = p.preview ? `<img src="${p.preview}" alt="">` : '<div class="photo-fallback" style="width:300px;height:120px">No preview available</div>';
+            popup.innerHTML = `${img}<div class="meta">${rows}</div>`;
+            popup.style.display = 'block';
+            const a = anchor.getBoundingClientRect();
+            const pw = popup.offsetWidth, ph = popup.offsetHeight;
+            let left = a.right + 12;
+            if (left + pw > window.innerWidth - 8) left = a.left - pw - 12;
+            left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+            const top = Math.max(8, Math.min(a.top + a.height / 2 - ph / 2, window.innerHeight - ph - 8));
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+            const imgEl = popup.querySelector('img');
+            if (imgEl && !imgEl.complete) imgEl.onload = () => showPopup(id, anchor);
+        }
+
+        // ---------- Export PDF ----------
+        async function jpegBytesFor(file, maxSide) {
+            const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+            const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(bmp.width * scale));
+            c.height = Math.max(1, Math.round(bmp.height * scale));
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, c.width, c.height);
+            ctx.drawImage(bmp, 0, 0, c.width, c.height);
+            bmp.close();
+            const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.88));
+            return new Uint8Array(await blob.arrayBuffer());
+        }
+
+        const latin = (s) => String(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+
+        async function downloadPdf() {
+            if (!pdfBytes) return showToast('Load a PDF first');
+            const btn = document.getElementById('download-btn');
+            btn.disabled = true;
+            const labelEl = btn.querySelector('.btn-label');
+            const label = labelEl.textContent;
+            labelEl.textContent = 'Building…';
+            try {
+                const { PDFDocument, StandardFonts, rgb } = PDFLib;
+                const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+                const page = doc.getPage(currentPage - 1);
+                if (page.getRotation().angle !== 0) throw new Error('rotated pages are not supported for export yet');
+                const cb = page.getCropBox();
+                const X = (x) => cb.x + x;
+                const Y = (y) => cb.y + cb.height - y;
+                const font = await doc.embedFont(StandardFonts.HelveticaBold);
+                const lw = Math.max(1, pageW / 800);
+                const fs = Math.max(7, pageW / 140);
+                // Archive / Draft: blueprint blue linework, ink text, sheet-coloured label plates
+                const ink = rgb(0.376, 0.49, 0.569);
+                const textInk = rgb(0.22, 0.22, 0.2);
+                const sheetFill = rgb(0.98, 0.973, 0.949);
+
+                regions.forEach((r) => {
+                    if (r.type === 'box') {
+                        page.drawRectangle({ x: X(r.x), y: Y(r.y + r.height), width: r.width, height: r.height, borderColor: ink, borderWidth: lw, color: ink, opacity: 0, borderOpacity: 1 });
+                    } else {
+                        const pts = r.points;
+                        for (let i = 0; i < pts.length - (r.closed ? 0 : 1); i++) {
+                            const a = pts[i], b = pts[(i + 1) % pts.length];
+                            page.drawLine({ start: { x: X(a.x), y: Y(a.y) }, end: { x: X(b.x), y: Y(b.y) }, thickness: lw, color: ink });
+                        }
+                    }
+                    const lp = r.type === 'box' ? { x: r.x, y: r.y } : r.points[0];
+                    const text = latin(r.label);
+                    const tw = font.widthOfTextAtSize(text, fs);
+                    page.drawRectangle({ x: X(lp.x), y: Y(lp.y) + 2, width: tw + 6, height: fs + 4, color: sheetFill, borderColor: textInk, borderWidth: lw * 0.5 });
+                    page.drawText(text, { x: X(lp.x) + 3, y: Y(lp.y) + 5, size: fs, font, color: textInk });
+                });
+
+                const placed = photos.filter((p) => p.pos && p.preview);
+                for (const p of placed) {
+                    const img = await doc.embedJpg(await jpegBytesFor(p.image, 1600));
+                    const { w, h } = markerSize(p);
+                    const x = X(p.pos.x - w / 2), y = Y(p.pos.y + h / 2);
+                    page.drawRectangle({ x: x - lw * 1.5, y: y - lw * 1.5, width: w + lw * 3, height: h + lw * 3, color: textInk });
+                    page.drawImage(img, { x, y, width: w, height: h });
+                    const r = regionOf(p);
+                    const cap = latin(`${r ? r.label + ' | ' : ''}${new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' })}`);
+                    const cs = Math.max(5, Math.min(fs * 0.8, w / 6));
+                    const cw = font.widthOfTextAtSize(cap, cs);
+                    page.drawRectangle({ x: x + w / 2 - cw / 2 - 2, y: y - cs - 4, width: cw + 4, height: cs + 3, color: sheetFill, opacity: 0.92 });
+                    page.drawText(cap, { x: x + w / 2 - cw / 2, y: y - cs - 2, size: cs, font, color: textInk });
+                }
+
+                const out = await doc.save();
+                const d = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+                a.download = `${pdfName}_photos_${stamp}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+                const skipped = photos.filter((p) => p.pos && !p.preview).length;
+                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'}${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
+            } catch (err) {
+                setSaveStatus('Could not build the PDF: ' + err.message, false);
+            } finally {
+                btn.disabled = false;
+                labelEl.textContent = label;
+            }
+        }
+        document.getElementById('download-btn').addEventListener('click', downloadPdf);
+
+        // ---------- Export: renamed photos ----------
+        const IMAGE_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/bmp': 'bmp' };
+
+        function safeFileName(s) {
+            return String(s).replace(/\s*[\\/:*?"<>|\x00-\x1f]+\s*/g, '-').replace(/\s+/g, '_').replace(/^[.\s_-]+|[._\s-]+$/g, '') || 'Region';
+        }
+
+        function timeStamp() {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+
+        // Every photo on the plan gets RegionName_## (## counts up by time taken within that region).
+        // Photos outside every region are NoRegion_##. HEIC photos are saved as the converted JPEG.
+        function photoExportPlan() {
+            const groups = new Map();
+            photos.filter((p) => p.pos && p.image).forEach((p) => {
+                const r = regionOf(p);
+                const base = r ? safeFileName(r.label) : 'NoRegion';
+                const key = base.toLowerCase();
+                if (!groups.has(key)) groups.set(key, { base, items: [] });
+                groups.get(key).items.push(p);
+            });
+            const out = [];
+            groups.forEach((g) => {
+                g.items.sort((a, b) => a.timestamp - b.timestamp || a.id - b.id);
+                const width = Math.max(2, String(g.items.length).length);
+                g.items.forEach((p, i) => {
+                    const ext = IMAGE_EXT[p.image.type] || (p.name.split('.').pop() || 'jpg').toLowerCase();
+                    out.push({ photo: p, region: regionOf(p), name: `${g.base}_${String(i + 1).padStart(width, '0')}.${ext}` });
+                });
+            });
+            return out;
+        }
+
+        function manifestCsv(plan) {
+            const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+            const rows = [['new_name', 'original_name', 'original_path', 'region', 'taken_at', 'taken_at_source', 'import_batch', 'gps_lat', 'gps_lon', 'plan_x', 'plan_y']];
+            plan.forEach(({ photo: p, region, name }) => rows.push([
+                name, p.name, p.path, region ? region.label : '', iso(p.timestamp), p.timeFromExif ? 'exif' : 'file_date', p.batch,
+                p.gps ? p.gps.lat : '', p.gps ? p.gps.lon : '', Math.round(p.pos.x * 100) / 100, Math.round(p.pos.y * 100) / 100
+            ]));
+            return rows.map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';
+        }
+
+        function updatePhotosButton() {
+            const n = photos.filter((p) => p.pos && p.image).length;
+            const btn = document.getElementById('photos-btn');
+            btn.disabled = n === 0;
+            btn.querySelector('.btn-label').textContent = n ? `Download photos (${n})` : 'Download photos';
+        }
+
+        // ---------- Saving to disk: verified writes and an always-visible result ----------
+        // Writing straight to a folder (File System Access API) can fail or be cancelled. Every outcome is
+        // reported in the toolbar, the write is read back to confirm, and a failure falls back to a normal download.
+        let usePlainDownloads = false;
+        try { usePlainDownloads = localStorage.getItem('mapphotos-plain-downloads') === '1'; } catch (err) { /* private mode */ }
+
+        let lastSave = null;          // { msg, ok, time } result of the last explicit save/export
+        let unsavedChanges = false;   // changed since the project JSON was last saved or opened
+
+        function renderSaveStatus() {
+            const el = document.getElementById('save-status');
+            const icon = lastSave ? `<svg class="icon icon-sm"><use href="#i-${lastSave.ok ? 'check' : 'triangle-alert'}"/></svg> ` : '';
+            let t = lastSave ? `${icon}${escapeHtml(lastSave.msg)} (${lastSave.time})` : '';
+            if (unsavedChanges && pdfBytes) t += (t ? ' · ' : '') + 'unsaved changes';
+            el.innerHTML = t;
+            el.title = el.textContent;
+            el.classList.toggle('bad', !!lastSave && !lastSave.ok);
+        }
+
+        function setSaveStatus(msg, ok = true) {
+            lastSave = { msg, ok, time: new Date().toLocaleTimeString([], { timeStyle: 'short' }) };
+            renderSaveStatus();
+            showToast((ok ? '' : 'Problem: ') + msg, ok ? 4500 : 12000);
+        }
+
+        const fmtBytes = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+        const describeError = (err) => `${err && err.name ? err.name : 'Error'}${err && err.message ? ': ' + err.message : ''}`;
+
+        function downloadBlob(blob, name) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        }
+
+        // Write, then read the file back and compare sizes, so "saved" means the bytes are on disk.
+        async function writeVerified(fileHandle, data, size) {
+            const w = await fileHandle.createWritable();
+            await w.write(data);
+            await w.close();
+            const onDisk = (await fileHandle.getFile()).size;
+            if (onDisk !== size) throw new Error(`wrote ${size} bytes but the file on disk has ${onDisk} bytes`);
+        }
+
+        async function downloadPhotos(forceZip) {
+            const plan = photoExportPlan();
+            if (!plan.length) return showToast('Drop at least one photo onto the plan first');
+            const skipped = photos.filter((p) => p.pos && !p.image).length;
+            const folderName = `${pdfName}_photos_${timeStamp()}`;
+            const csv = manifestCsv(plan);
+            const csvBlob = new Blob([csv], { type: 'text/csv' });
+            const note = skipped ? `; ${skipped} skipped (file missing)` : '';
+            const count = `${plan.length} photo${plan.length === 1 ? '' : 's'}`;
+            let problem = null;
+
+            if (!forceZip && !usePlainDownloads && window.showDirectoryPicker) {
+                try {
+                    const root = await window.showDirectoryPicker({ id: 'mapphotos-export', mode: 'readwrite', startIn: 'desktop' });
+                    const dir = await root.getDirectoryHandle(folderName, { create: true });
+                    for (let i = 0; i < plan.length; i++) {
+                        showToast(`Saving photo ${i + 1} of ${plan.length}…`);
+                        await writeVerified(await dir.getFileHandle(plan[i].name, { create: true }), plan[i].photo.image, plan[i].photo.image.size);
+                    }
+                    await writeVerified(await dir.getFileHandle('_manifest.csv', { create: true }), csvBlob, csvBlob.size);
+                    setSaveStatus(`Saved ${count} to the folder "${root.name}" > ${folderName}${note}`);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return setSaveStatus('Photo download cancelled. Nothing was saved.', false);
+                    problem = describeError(err);
+                }
+            }
+
+            showToast('Building ZIP…');
+            const zip = new JSZip();
+            plan.forEach(({ photo, name }) => zip.file(name, photo.image, { compression: 'STORE' }));
+            zip.file('_manifest.csv', csv);
+            const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+            downloadBlob(blob, `${folderName}.zip`);
+            if (problem) setSaveStatus(`Could not write the photos to a folder (${problem}). Downloaded ${folderName}.zip to your Downloads folder instead.`, false);
+            else setSaveStatus(`Downloaded ${folderName}.zip (${count}, ${fmtBytes(blob.size)}) to your Downloads folder${note}`);
+        }
+
+        document.getElementById('photos-btn').addEventListener('click', () => downloadPhotos(false));
+        document.getElementById('photos-zip-btn').addEventListener('click', () => { closeSettings(); downloadPhotos(true); });
+
+        // ---------- Projects: JSON ----------
+        // The project file is plain JSON. It lists the plan and photos by name/path (not their pixels),
+        // plus dates, batches, regions and where each photo sits. See templates/project.template.json.
+        const iso = (ms) => (ms ? new Date(ms).toISOString() : null);
+        const fromIso = (s) => (s ? Date.parse(s) : null);
+        const round = (n) => Math.round(n * 100) / 100;
+
+        function projectToJson() {
+            const regionJson = (r) => (r.type === 'box'
+                ? { id: r.id, label: r.label, type: 'box', x: round(r.x), y: round(r.y), width: round(r.width), height: round(r.height) }
+                : { id: r.id, label: r.label, type: 'polyline', closed: r.closed !== false, points: r.points.map((pt) => ({ x: round(pt.x), y: round(pt.y) })) });
+            return {
+                format: 'mapphotos-project',
+                version: 1,
+                name: pdfName,
+                saved_at: iso(Date.now()),
+                coordinate_units: 'Plan units: PDF points at 100% zoom, origin at the top-left of the page, y increases downward.',
+                plan: {
+                    file_name: planInfo ? planInfo.name : pdfName + '.pdf',
+                    path: planInfo ? planInfo.path : pdfName + '.pdf',
+                    size_bytes: planInfo ? planInfo.size : null,
+                    modified: planInfo ? iso(planInfo.modified) : null,
+                    page: currentPage,
+                    page_width: round(pageW),
+                    page_height: round(pageH)
+                },
+                settings: { photo_size_percent_of_page_width: photoSizePct },
+                regions: regions.map(regionJson),
+                import_batches: importBatches.map((b) => ({ batch: b.batch, imported_at: iso(b.imported_at), source: b.source, photo_count: b.photo_count })),
+                photos: photos.map((p) => {
+                    const r = regionOf(p);
+                    return {
+                        id: p.id,
+                        file_name: p.name,
+                        path: p.path,
+                        size_bytes: p.size,
+                        modified: iso(p.modified),
+                        format: p.format,
+                        import_batch: p.batch,
+                        imported_at: iso(p.importedAt),
+                        taken_at: iso(p.timestamp),
+                        taken_at_source: p.timeFromExif ? 'exif' : 'file_date',
+                        gps: p.gps ? { lat: +p.gps.lat.toFixed(6), lon: +p.gps.lon.toFixed(6) } : null,
+                        camera: p.camera || null,
+                        aspect_ratio: round(p.aspect),
+                        placed: !!p.pos,
+                        position: p.pos ? { x: round(p.pos.x), y: round(p.pos.y) } : null,
+                        region: r ? r.label : null,
+                        region_id: r ? r.id : null
+                    };
+                })
+            };
+        }
+
+        function planFromJson(json) {
+            return { name: json.plan.file_name, path: json.plan.path || json.plan.file_name, size: json.plan.size_bytes, modified: fromIso(json.plan.modified) };
+        }
+
+        // Rebuild the session. sources[i] is { file } (raw file, converted if HEIC), { image } (ready blob) or null (missing).
+        async function applyProject(json, planBytes, planFile, sources) {
+            hidePopup();
+            photos.forEach((p) => { if (p.thumb) URL.revokeObjectURL(p.thumb); if (p.preview) URL.revokeObjectURL(p.preview); });
+            await openPdfBytes(planBytes, json.name || String(json.plan.file_name).replace(/\.pdf$/i, ''));
+            planInfo = planFile;
+            regions = (json.regions || []).map((r) => (r.type === 'box'
+                ? { id: r.id, label: r.label, type: 'box', x: r.x, y: r.y, width: r.width, height: r.height }
+                : { id: r.id, label: r.label, type: 'polyline', closed: r.closed !== false, points: (r.points || []).map((pt) => ({ x: pt.x, y: pt.y })) }));
+            nextRegionId = regions.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+            selectedRegionFilters.clear();
+            setPhotoSize(json.settings && json.settings.photo_size_percent_of_page_width ? json.settings.photo_size_percent_of_page_width : 5, false);
+            importBatches = (json.import_batches || []).map((b) => ({ batch: b.batch, imported_at: fromIso(b.imported_at), source: b.source, photo_count: b.photo_count }));
+            photos = [];
+            const used = new Set();
+            const list = json.photos || [];
+            for (let i = 0; i < list.length; i++) {
+                const jp = list[i];
+                const src = sources[i];
+                let image = null, derived = { aspect: jp.aspect_ratio || 1, thumb: null, preview: null }, loaded = null;
+                if (src && src.file) {
+                    showToast(`Loading photo ${i + 1} of ${list.length}…`);
+                    loaded = (await loadPhotoFile(src.file)).photo;
+                    image = loaded.image;
+                    derived = { aspect: loaded.aspect, thumb: loaded.thumb, preview: loaded.preview };
+                } else if (src && src.image) {
+                    image = src.image;
+                    derived = await deriveImages(image);
+                }
+                let id = Number.isInteger(jp.id) && !used.has(jp.id) ? jp.id : null;
+                if (id === null) { id = 1; while (used.has(id)) id++; }
+                used.add(id);
+                photos.push({
+                    id,
+                    name: jp.file_name,
+                    path: jp.path || jp.file_name,
+                    size: jp.size_bytes,
+                    modified: fromIso(jp.modified),
+                    format: jp.format,
+                    batch: jp.import_batch,
+                    importedAt: fromIso(jp.imported_at),
+                    image,
+                    ...derived,
+                    timestamp: fromIso(jp.taken_at) || (loaded && loaded.timestamp) || fromIso(jp.modified) || Date.now(),
+                    timeFromExif: jp.taken_at ? jp.taken_at_source === 'exif' : !!(loaded && loaded.timeFromExif),
+                    gps: jp.gps !== undefined ? jp.gps : (loaded ? loaded.gps : null),
+                    camera: jp.camera !== undefined ? jp.camera : (loaded ? loaded.camera : null),
+                    pos: jp.position ? { x: jp.position.x, y: jp.position.y } : null,
+                    missing: !image
+                });
+            }
+            nextPhotoId = photos.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+            updateRegionsList();
+            redrawAnnotations();
+            unsavedChanges = false;
+            lastSave = null;
+            renderSaveStatus();
+        }
+
+        let saveHandle = null;
+        async function saveProjectFile(forceNew, plain) {
+            if (!pdfBytes) return showToast('Load a PDF first');
+            const blob = new Blob([JSON.stringify(projectToJson(), null, 2)], { type: 'application/json' });
+            const name = `${pdfName}.mapphotos.json`;
+            let problem = null;
+            if (window.showSaveFilePicker && !plain && !usePlainDownloads) {
+                try {
+                    if (!saveHandle || forceNew) {
+                        saveHandle = await window.showSaveFilePicker({
+                            suggestedName: name,
+                            startIn: 'desktop',
+                            types: [{ description: 'Map Photos project (JSON)', accept: { 'application/json': ['.json'] } }]
+                        });
+                    }
+                    await writeVerified(saveHandle, blob, blob.size);
+                    unsavedChanges = false;
+                    setSaveStatus(`Saved ${saveHandle.name} (${fmtBytes(blob.size)})`);
+                    return;
+                } catch (err) {
+                    if (err.name === 'AbortError') return setSaveStatus('Save cancelled. Nothing was written.', false);
+                    saveHandle = null;
+                    problem = describeError(err);
+                }
+            }
+            downloadBlob(blob, name);
+            unsavedChanges = false;
+            if (problem) setSaveStatus(`Could not write with the save dialog (${problem}). Downloaded ${name} to your Downloads folder instead.`, false);
+            else setSaveStatus(`Downloaded ${name} (${fmtBytes(blob.size)}) to your Downloads folder`);
+        }
+
+        document.getElementById('save-btn').addEventListener('click', () => saveProjectFile(false));
+        document.getElementById('save-copy-btn').addEventListener('click', () => { closeSettings(); saveProjectFile(true); });
+        document.getElementById('save-download-btn').addEventListener('click', () => { closeSettings(); saveProjectFile(false, true); });
+        document.getElementById('plain-downloads-toggle').checked = usePlainDownloads;
+        document.getElementById('plain-downloads-toggle').addEventListener('change', (e) => {
+            usePlainDownloads = e.target.checked;
+            try { localStorage.setItem('mapphotos-plain-downloads', usePlainDownloads ? '1' : '0'); } catch (err) { /* ignore */ }
+            saveHandle = null;
+        });
+
+        // ---------- Projects: linking files to a JSON project ----------
+        // The JSON only names its files, so after opening it we match each name/path to files you point at.
+        let link = null;
+        const normPath = (s) => String(s || '').replace(/\\/g, '/').replace(/^\.?\//, '').toLowerCase();
+
+        function startLink(mode, assets, json) {
+            link = { mode, assets, json, pool: [], matches: new Map() };
+            document.getElementById('link-title').textContent = mode === 'open' ? 'Link the files for this project' : 'Link the missing photos';
+            document.getElementById('link-intro').textContent = mode === 'open'
+                ? 'The project file lists its plan and photos by name. Choose the folder that holds them (sub-folders are searched), or pick the files.'
+                : 'These photos were not found. Choose the folder that holds them, or pick the files.';
+            document.getElementById('link-done').textContent = mode === 'open' ? 'Open project' : 'Link files';
+            renderLink();
+            document.getElementById('link-modal').classList.add('active');
+        }
+
+        function addToLinkPool(fileList) {
+            Array.from(fileList).forEach((f) => {
+                const full = normPath(f.webkitRelativePath || f.name);
+                link.pool.push({ file: f, full, rel: normPath((f.webkitRelativePath || '').split('/').slice(1).join('/')) || normPath(f.name), name: f.name.toLowerCase() });
+            });
+            renderLink();
+        }
+
+        function findLinkFile(a) {
+            const p = normPath(a.path), n = String(a.name).toLowerCase();
+            const byPath = link.pool.find((e) => e.full === p || e.rel === p || e.full.endsWith('/' + p));
+            if (byPath) return byPath.file;
+            const sameName = link.pool.filter((e) => e.name === n);
+            const bySize = sameName.find((e) => a.size != null && e.file.size === a.size);
+            if (bySize) return bySize.file;
+            return sameName.length === 1 ? sameName[0].file : null;
+        }
+
+        function renderLink() {
+            link.matches.clear();
+            link.assets.forEach((a) => { const f = findLinkFile(a); if (f) link.matches.set(a.key, f); });
+            document.getElementById('link-list').innerHTML = link.assets.map((a) => {
+                const ok = link.matches.has(a.key);
+                return `<div class="link-row ${ok ? 'ok' : 'miss'}"><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#i-${ok ? 'check' : 'x'}"/></svg> ${a.kind === 'plan' ? '<b>Plan:</b> ' : ''}${escapeHtml(a.path)}</div>`;
+            }).join('');
+            const found = link.matches.size;
+            document.getElementById('link-summary').textContent = `Found ${found} of ${link.assets.length}`;
+            document.getElementById('link-done').disabled = link.mode === 'open' && !link.matches.has('plan');
+        }
+
+        document.getElementById('link-folder').addEventListener('change', (e) => { addToLinkPool(e.target.files); e.target.value = ''; });
+        document.getElementById('link-files').addEventListener('change', (e) => { addToLinkPool(e.target.files); e.target.value = ''; });
+        document.getElementById('link-cancel').addEventListener('click', () => { document.getElementById('link-modal').classList.remove('active'); link = null; });
+
+        document.getElementById('link-done').addEventListener('click', async () => {
+            const s = link;
+            if (!s) return;
+            document.getElementById('link-modal').classList.remove('active');
+            try {
+                if (s.mode === 'open') {
+                    const planFile = s.matches.get('plan');
+                    const sources = s.json.photos.map((_, i) => (s.matches.get('p' + i) ? { file: s.matches.get('p' + i) } : null));
+                    const info = planFromJson(s.json);
+                    await applyProject(s.json, new Uint8Array(await planFile.arrayBuffer()), { ...info, size: planFile.size, modified: planFile.lastModified }, sources);
+                    saveHandle = null;
+                    const missing = photos.filter((p) => p.missing).length;
+                    showToast(missing ? `Opened. ${missing} photo(s) not found. Use Link files.` : 'Project opened');
+                } else {
+                    let n = 0;
+                    for (const p of photos.filter((p) => p.missing)) {
+                        const f = s.matches.get('p' + p.id);
+                        if (!f) continue;
+                        const r = (await loadPhotoFile(f)).photo;
+                        Object.assign(p, { image: r.image, thumb: r.thumb, preview: r.preview, aspect: r.aspect, missing: false });
+                        n++;
+                    }
+                    updatePhotoGrid();
+                    showToast(`Linked ${n} photo(s)`);
+                }
+            } catch (err) {
+                showToast('Could not open the project: ' + err.message);
+            }
+            link = null;
+        });
+
+        document.getElementById('link-btn').addEventListener('click', () => {
+            const assets = photos.filter((p) => p.missing).map((p) => ({ key: 'p' + p.id, kind: 'photo', path: p.path, name: p.name, size: p.size }));
+            startLink('relink', assets, null);
+        });
+
+        document.getElementById('project-open').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            try {
+                let json;
+                try { json = JSON.parse(await file.text()); } catch (err) { throw new Error('not a Map Photos project file'); }
+                if (!json || json.format !== 'mapphotos-project' || !json.plan) throw new Error('not a Map Photos project file');
+                if (json.version > 1) throw new Error('this project was saved by a newer version of the app');
+                const assets = [{ key: 'plan', kind: 'plan', path: json.plan.path || json.plan.file_name, name: json.plan.file_name, size: json.plan.size_bytes }];
+                (json.photos || []).forEach((jp, i) => assets.push({ key: 'p' + i, kind: 'photo', path: jp.path || jp.file_name, name: jp.file_name, size: jp.size_bytes }));
+                startLink('open', assets, json);
+            } catch (err) {
+                showToast('Could not open project: ' + err.message);
+            }
+        });
+
+        // ---------- Projects: browser cache (IndexedDB) ----------
+        function idbOpen() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('mapphotos-cache', 1);
+                req.onupgradeneeded = () => req.result.createObjectStore('kv');
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        async function idbRun(mode, fn) {
+            const db = await idbOpen();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('kv', mode);
+                const req = fn(tx.objectStore('kv'));
+                tx.oncomplete = () => { db.close(); resolve(req.result); };
+                tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+            });
+        }
+
+        let autosaveOn = true;
+        try { autosaveOn = localStorage.getItem('mapphotos-autosave') !== '0'; } catch (err) { /* private mode */ }
+        document.getElementById('autosave-toggle').checked = autosaveOn;
+        document.getElementById('autosave-toggle').addEventListener('change', (e) => {
+            autosaveOn = e.target.checked;
+            try { localStorage.setItem('mapphotos-autosave', autosaveOn ? '1' : '0'); } catch (err) { /* ignore */ }
+            if (autosaveOn) scheduleAutosave();
+        });
+
+        let autosaveTimer = null;
+        function scheduleAutosave() {
+            if (pdfBytes && !unsavedChanges) { unsavedChanges = true; renderSaveStatus(); }
+            if (!autosaveOn || !pdfBytes) return;
+            clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(doAutosave, 1500);
+        }
+
+        // The browser copy keeps the actual pixels too, so Resume works without re-linking files.
+        async function doAutosave() {
+            try {
+                const images = {};
+                photos.forEach((p) => { if (p.image) images[p.id] = p.image; });
+                await idbRun('readwrite', (s) => s.put({ json: projectToJson(), plan: new Blob([pdfBytes], { type: 'application/pdf' }), images }, 'project'));
+                document.getElementById('autosave-status').textContent = `Browser copy updated ${new Date().toLocaleTimeString([], { timeStyle: 'short' })}`;
+            } catch (err) {
+                document.getElementById('autosave-status').textContent = 'Browser copy failed (storage full?)';
+                setSaveStatus(`The browser auto-save failed (${describeError(err)}). Use Save JSON.`, false);
+            }
+        }
+
+        document.getElementById('clear-cache-btn').addEventListener('click', async () => {
+            clearTimeout(autosaveTimer);
+            try { await idbRun('readwrite', (s) => s.delete('project')); } catch (err) { /* nothing cached */ }
+            document.getElementById('resume-box').style.display = 'none';
+            document.getElementById('autosave-status').textContent = '';
+            showToast('Browser copy cleared');
+        });
+
+        async function offerResume() {
+            try {
+                const cached = await idbRun('readonly', (s) => s.get('project'));
+                if (!cached || !cached.json || pdfBytes) return;
+                const j = cached.json;
+                const n = (j.photos || []).length;
+                const btn = document.getElementById('resume-btn');
+                btn.innerHTML = '<svg class="icon"><use href="#i-rotate-ccw"/></svg><span></span>';
+                btn.querySelector('span').textContent = `Resume “${j.name}” (${n} photo${n === 1 ? '' : 's'}, saved ${new Date(j.saved_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })})`;
+                btn.onclick = async () => {
+                    btn.disabled = true;
+                    try {
+                        const sources = (j.photos || []).map((jp) => (cached.images[jp.id] ? { image: cached.images[jp.id] } : null));
+                        await applyProject(j, new Uint8Array(await cached.plan.arrayBuffer()), planFromJson(j), sources);
+                    } catch (err) { showToast('Could not resume: ' + err.message); }
+                    btn.disabled = false;
+                };
+                document.getElementById('discard-btn').onclick = async () => {
+                    await idbRun('readwrite', (s) => s.delete('project'));
+                    document.getElementById('resume-box').style.display = 'none';
+                };
+                document.getElementById('resume-box').style.display = 'block';
+            } catch (err) { /* no cache available */ }
+        }
+
+        // ---------- Settings ----------
+        const DEFAULT_PHOTO_SIZE = 5;
+        function toggleSettings() {
+            document.getElementById('settings-modal').classList.toggle('active');
+        }
+        document.getElementById('settings-btn').addEventListener('click', toggleSettings);
+        document.getElementById('settings-toolbar-btn').addEventListener('click', toggleSettings);
+        function closeSettings() {
+            document.getElementById('settings-modal').classList.remove('active');
+        }
+
+        // One size for every photo, placed or not. Photos are re-laid out immediately.
+        function setPhotoSize(pct, save = true) {
+            photoSizePct = Math.min(20, Math.max(1, +pct || DEFAULT_PHOTO_SIZE));
+            document.getElementById('photo-size').value = photoSizePct;
+            document.getElementById('photo-size-label').textContent = photoSizePct;
+            renderMarkers();
+            if (save) scheduleAutosave();
+        }
+        document.getElementById('photo-size').addEventListener('input', (e) => setPhotoSize(e.target.value));
+        document.getElementById('photo-size-reset').addEventListener('click', () => setPhotoSize(DEFAULT_PHOTO_SIZE));
+        document.querySelectorAll('.modal').forEach((modal) => {
+            modal.addEventListener('click', (e) => {
+                if (e.target !== modal) return;
+                if (modal.id === 'label-modal') cancelRegionLabel();
+                else modal.classList.remove('active');
+            });
+        });
+
+        updateRegionsList();
+        offerResume();
+        // canvas text needs the self-hosted fonts; redraw once they are ready
+        if (document.fonts && document.fonts.ready) document.fonts.load('500 11px "IBM Plex Mono"').then(() => redrawAnnotations());
+    </script>
+</body>
+</html>
