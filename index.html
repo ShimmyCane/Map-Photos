@@ -1243,7 +1243,8 @@
             };
         }
 
-        async function importPhotos(files, source) {
+        // placeAt (plan point, optional): photos dropped on the plan are placed there, offset a little each
+        async function importPhotos(files, source, placeAt = null) {
             if (!files.length) return;
             const batch = { batch: importBatches.length + 1, imported_at: Date.now(), source, photo_count: files.length };
             importBatches.push(batch);
@@ -1254,6 +1255,10 @@
                 if (!ok) failed++;
                 photo.batch = batch.batch;
                 photo.importedAt = batch.imported_at;
+                if (placeAt && pdfDoc) {
+                    const step = pageW * 0.02;
+                    photo.pos = clampToPage({ x: placeAt.x + i * step, y: placeAt.y + i * step });
+                }
                 photos.push(photo);
                 updatePhotoGrid();
             }
@@ -1348,14 +1353,24 @@
         });
 
         // ---------- Photos: placing on the plan ----------
+        const isImageFile = (f) => f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name);
+        const dragHasFiles = (e) => Array.from(e.dataTransfer.types || []).includes('Files');
+
         container.addEventListener('dragover', (e) => {
-            if (draggedPhotoId === null) return;
+            if (draggedPhotoId === null && !dragHasFiles(e)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
         });
 
         container.addEventListener('drop', (e) => {
-            if (draggedPhotoId === null) return;
+            if (draggedPhotoId === null) {
+                // Image files dragged in from the desktop: import them and place them where they were dropped
+                const files = Array.from(e.dataTransfer.files || []).filter(isImageFile);
+                if (!files.length) return;
+                e.preventDefault();
+                importPhotos(files, 'drop', pdfDoc ? toPlan(e) : null);
+                return;
+            }
             e.preventDefault();
             const p = photos.find((p) => p.id === draggedPhotoId);
             draggedPhotoId = null;
@@ -1491,6 +1506,40 @@
 
         const latin = (s) => String(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 
+        // A placed photo is written as a Stamp annotation, not drawn into the page, so it stays its own object:
+        // Bluebeam or Acrobat can select, move, resize and delete it without touching the plan. The annotation's
+        // appearance (frame, JPEG, caption plate) lives in its own form XObject, so every viewer draws it the same.
+        function addPhotoStamp(doc, page, o) {
+            const { img, x, y, w, h, cap, cs, cw, font, lw, frame, plate, ink, title, contents, name } = o;
+            const pad = lw * 1.5;
+            const capH = cs + 5;
+            const cx = x + w / 2;
+            const boxW = Math.max(w + pad * 2, cw + 6);
+            const left = cx - boxW / 2, right = cx + boxW / 2;
+            const bottom = y - capH - pad, top = y + h + pad;
+            const hex = (s) => Array.from(s, (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+            const rgbOp = (c) => c.join(' ');
+            const ops = [
+                `${rgbOp(frame)} rg ${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2} re f`,
+                `q ${w} 0 0 ${h} ${x} ${y} cm /Im0 Do Q`,
+                `${rgbOp(plate)} rg ${rgbOp(ink)} RG ${lw * 0.5} w ${cx - cw / 2 - 3} ${y - cs - 5} ${cw + 6} ${cs + 4} re B`,
+                `BT /F1 ${cs} Tf ${rgbOp(ink)} rg ${cx - cw / 2} ${y - cs - 2} Td <${hex(cap)}> Tj ET`
+            ].join('\n');
+            const resources = doc.context.obj({ XObject: { Im0: img.ref }, Font: { F1: font.ref } });
+            const appearance = doc.context.register(doc.context.flateStream(new TextEncoder().encode(ops), {
+                Type: 'XObject', Subtype: 'Form', BBox: [left, bottom, right, top], Resources: resources
+            }));
+            const annot = doc.context.obj({
+                Type: 'Annot', Subtype: 'Stamp', Rect: [left, bottom, right, top], F: 4, P: page.ref,
+                AP: { N: appearance },
+                T: PDFLib.PDFHexString.fromText(title),
+                Subj: PDFLib.PDFHexString.fromText('Photo'),
+                Contents: PDFLib.PDFHexString.fromText(contents),
+                NM: PDFLib.PDFHexString.fromText(name)
+            });
+            page.node.addAnnot(doc.context.register(annot));
+        }
+
         async function downloadPdf() {
             if (!pdfBytes) return showToast('Load a PDF first');
             const btn = document.getElementById('download-btn');
@@ -1553,18 +1602,23 @@
                 });
 
                 const placed = photos.filter((p) => p.pos && p.preview);
-                for (const p of placed) {
+                const frameRgb = [0.22, 0.22, 0.2], plateRgb = [0.98, 0.973, 0.949];
+                for (const [i, p] of placed.entries()) {
                     const img = await doc.embedJpg(await jpegBytesFor(p.image, 1600));
                     const { w, h } = markerSize(p);
                     const x = X(p.pos.x - w / 2), y = Y(p.pos.y + h / 2);
-                    page.drawRectangle({ x: x - lw * 1.5, y: y - lw * 1.5, width: w + lw * 3, height: h + lw * 3, color: textInk });
-                    page.drawImage(img, { x, y, width: w, height: h });
                     const r = regionOf(p);
-                    const cap = latin(`${r ? r.label + ' | ' : ''}${new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' })}`);
+                    const time = new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' });
+                    const cap = latin(`${r ? r.label + ' | ' : ''}${time}`);
                     const cs = Math.max(5, Math.min(fs * 0.8, w / 6));
                     const cw = font.widthOfTextAtSize(cap, cs);
-                    page.drawRectangle({ x: x + w / 2 - cw / 2 - 2, y: y - cs - 4, width: cw + 4, height: cs + 3, color: sheetFill, opacity: 0.92 });
-                    page.drawText(cap, { x: x + w / 2 - cw / 2, y: y - cs - 2, size: cs, font, color: textInk });
+                    addPhotoStamp(doc, page, {
+                        img, x, y, w, h, cap, cs, cw, font, lw,
+                        frame: frameRgb, plate: plateRgb, ink: frameRgb,
+                        title: 'Map Photos',
+                        contents: `${r ? r.label + ' | ' : ''}${time} | ${p.name}`,
+                        name: `mapphotos-${timeStamp()}-${i + 1}`
+                    });
                 }
 
                 const out = await doc.save();
@@ -1579,7 +1633,7 @@
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 10000);
                 const skipped = photos.filter((p) => p.pos && !p.preview).length;
-                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'}${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
+                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'} as movable annotations${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
             } catch (err) {
                 setSaveStatus('Could not build the PDF: ' + err.message, false);
             } finally {
