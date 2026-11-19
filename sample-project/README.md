@@ -34,14 +34,16 @@ The three tools are in the left rail under the region tools. Click the tool, the
 
 Tags are labels for photos, separate from regions. The sample has three: Ticketing, Stage view and Seating. Each tag with **Tab** ticked appears as a coloured tab above the plan.
 
+- New tags are not tabs. Make one with **+ Tab** above the plan: pick a tag from the list, or type a new name (it creates the tag).
+- Double-click a tab, or use **Rename** in the Tags panel, to rename a tag. Renaming a layer's tag renames the layer too.
 - Click a tab to show only that tag's photos on the plan. **All photos** shows everything.
 - Drag a photo card onto a tab to tag it. Dropped while you are viewing a different tab, it moves: it comes off the tab you were viewing.
 - Choose the **pointer** tool (arrow icon in the left rail), then click a photo on the plan to select it. Drag it to move it. The **Selected photo** panel on the right lists every tag with a tick box, and a **Move / Add** control.
 - Add your own tags in the **Tags** panel. Pick a colour with the swatch. Untick **Tab** to keep a tag off the tab bar.
 
-## Schemes
+## Layers
 
-The **Scheme** panel switches between sets of regions on the same plan. The sample has an Areas scheme. Use **New** to start another, for example Trades with Mechanical and Electrical regions. Regions you draw go into the scheme shown.
+Areas is the base layer. Its region names make the photo file names (for example `Stage_01.jpg`), and it cannot be renamed or deleted. The **Layers** panel can show another layer on the plan. Make one with **New layer**: its name becomes a tag (for example Trades). Other layers do not change file names.
 
 ## Draw your own region
 

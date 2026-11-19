@@ -24,7 +24,7 @@ On **Open JSON** the app asks you to choose the folder (or files). Each asset is
 | `plan.page`, `plan.page_width`, `plan.page_height` | Page used (only page 1 so far) and its size in points. |
 | `settings.photo_size_percent_of_page_width` | Size of every photo on the plan (1 to 20). All photos share one size. |
 | `regions[]` | The active scheme's regions (kept for older readers; `schemes[]` is the full list). Drawn regions. `type` is `box` (`x`, `y`, `width`, `height`) or `polyline` (`closed`, `points[{x,y}]`). `label` is the name you typed. |
-| `schemes[]` | Region schemes (semantic layers): `id`, `name`, `regions[]` (same shape as `regions[]`). Each scheme is its own set of regions on the plan. Older files without it load as one scheme named Areas. |
+| `schemes[]` | Layers: `id`, `name`, `regions[]`. The first entry is the base layer (Areas), which decides photo names and locations. Each later layer's name is also a tag. (same shape as `regions[]`). Each scheme is its own set of regions on the plan. Older files without it load as one scheme named Areas. |
 | `active_scheme` | `id` of the scheme shown on the plan and used for photo locations. |
 | `tags[]` | Tags: `id`, `name`, `color` (`#rrggbb`), `tab` (true = shown as a tab above the plan). |
 | `annotations[]` | Markup. `type` is `note` (`x`, `y`, `text`), `arrow` (`x1`, `y1` tail, `x2`, `y2` point) or `cloud` (`x`, `y`, `width`, `height`). Optional; older files without it open fine. |
