@@ -9,6 +9,8 @@
     <script src="libs/pdf-lib.min.js"></script>
     <script src="libs/heic2any.min.js"></script>
     <script src="libs/jszip.min.js"></script>
+    <link rel="stylesheet" href="libs/leaflet.css">
+    <script src="libs/leaflet.js"></script>
     <script src="sample-project/hollywood_bowl.sample.js"></script>  <!-- optional: lets the start screen offer the sample project -->
     <style>
         /* Map Photos: app-specific layout on top of the Archive / Draft system */
@@ -326,7 +328,34 @@
         .tool-active.select-mode .photo-marker { pointer-events: auto; cursor: grab; }
         .photo-marker.selected { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink-black); z-index: 45; }
         #tab-bar { display: flex; gap: 4px; align-items: flex-end; padding: 6px 10px 0; background: var(--panel); border-bottom: 1px solid var(--border-dark); overflow-x: auto; flex: none; }
-        body:not(.has-pdf) #tab-bar { display: none; }
+        body:not(.has-pdf) #tab-list, body:not(.has-pdf) .tab-add { display: none; }
+        body.map-mode #tab-list, body.map-mode .tab-add { display: none; }
+        body.map-mode .sidebar { display: none; }
+        [hidden] { display: none !important; }
+        .view-switch { display: flex; flex: none; align-self: flex-end; margin-right: 12px; padding-bottom: 6px; }
+        .view-btn { font-family: var(--font-technical); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--ink); background: var(--sheet); color: var(--ink); cursor: pointer; }
+        .view-btn + .view-btn { border-left: 0; }
+        .view-btn.active { background: var(--ink-black); color: var(--sheet); }
+        #map-view { flex: 1; min-height: 0; display: flex; }
+        #map { flex: 1; min-width: 0; background: var(--board); }
+        .map-side { width: 310px; flex: none; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--border-dark); padding: 0 var(--space-3) var(--space-3); }
+        .map-side .section { padding-top: var(--space-3); }
+        .map-side .input { width: 100%; box-sizing: border-box; }
+        .geo-field { display: block; font-size: 12px; margin-bottom: 8px; }
+        .geo-field .input, .geo-field .select { margin-top: 3px; }
+        .geo-field input[type="range"] { width: 100%; }
+        .geo-readout { font-size: 12px; line-height: 1.45; padding: 6px 8px; margin: 6px 0; border: 1px dashed var(--border-dark); background: var(--sheet); }
+        .geo-status { font-family: var(--font-technical); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .geo-status.ok { color: var(--blue); }
+        .geo-status.warn { color: var(--red); }
+        .plan-overlay-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+        .geo-photo { background: var(--sheet); border: 1px solid var(--ink); box-shadow: var(--shadow-paper); padding: 2px; }
+        .geo-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .geo-photo.approved { border: 2px solid var(--blue); }
+        .geo-row { display: flex; gap: 8px; align-items: center; padding: 4px 6px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--sheet); font-size: 12px; cursor: pointer; }
+        .geo-row.outside { opacity: 0.6; }
+        .geo-row img { width: 42px; height: 32px; object-fit: cover; display: block; border: 1px solid var(--ink); flex: none; }
+        .geo-row .label { font-size: 10px; }
         .plan-tab { font-family: var(--font-technical); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--border-dark); border-bottom: 0; border-top: 4px solid var(--tab, var(--ink)); background: var(--sheet); color: var(--ink); cursor: pointer; }
         .plan-tab.active { background: var(--panel-hover); box-shadow: inset 0 -3px 0 var(--tab, var(--ink)); font-weight: 600; }
         .plan-tab.drop { outline: 2px dashed var(--ink); outline-offset: -4px; }
@@ -450,6 +479,10 @@
 
             <main class="pdf-panel">
                 <div id="tab-bar">
+                    <span class="view-switch">
+                        <button class="view-btn active" id="view-plan">Plan</button>
+                        <button class="view-btn" id="view-map" title="Map: place the plan on OpenStreetMap and check geotagged photos">Map</button>
+                    </span>
                     <span id="tab-list"></span>
                     <span class="tab-add">
                         <select id="tab-pick" class="select" title="Pick an existing tag for a new tab"></select>
@@ -476,6 +509,47 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div id="map-view" hidden>
+                    <div id="map"></div>
+                    <aside class="map-side">
+                        <div class="section">
+                            <div class="section-title">Plan on map</div>
+                            <div id="geo-status" class="geo-status"></div>
+                            <label class="geo-field">Drawing scale 1 : <input type="number" class="input" id="geo-ratio" min="1" step="1" value="100"></label>
+                            <label class="geo-field">Rotation (degrees clockwise from north; 0 = top of plan points north)
+                                <input type="number" class="input" id="geo-rot" step="0.5" value="0">
+                                <input type="range" id="geo-rot-slider" min="-180" max="180" step="0.5" value="0">
+                            </label>
+                            <div class="scheme-row">
+                                <label class="geo-field" style="flex:1 1 45%">Centre lat <input type="number" class="input" id="geo-lat" step="0.000001"></label>
+                                <label class="geo-field" style="flex:1 1 45%">Centre lng <input type="number" class="input" id="geo-lng" step="0.000001"></label>
+                            </div>
+                            <div class="scheme-row">
+                                <button class="btn btn-sm" id="geo-goto">Go to plan</button>
+                                <button class="btn btn-sm" id="geo-use-view">Centre = map view</button>
+                                <button class="btn btn-sm" id="geo-pick">Click map to set centre</button>
+                            </div>
+                            <label class="geo-field">Opacity <input type="range" id="geo-opacity" min="0" max="1" step="0.05" value="0.6"></label>
+                            <label class="check"><input type="checkbox" id="geo-show" checked> Show plan on map</label>
+                            <div id="geo-readout" class="geo-readout"></div>
+                            <div class="scheme-row">
+                                <button class="btn btn-primary btn-sm" id="geo-confirm">Confirm placement</button>
+                                <button class="btn btn-danger btn-sm" id="geo-clear">Remove placement</button>
+                            </div>
+                            <div class="photo-help">Check the plan against map features: roads, buildings, the scale bar at the bottom left. The red frame is the plan; its top edge is marked. Confirm only when the orientation and size look right.</div>
+                        </div>
+                        <div class="section">
+                            <div class="section-title">Geotagged photos <span id="geo-count"></span></div>
+                            <div class="scheme-row">
+                                <button class="btn btn-sm" id="geo-scan">Scan for geotags</button>
+                                <button class="btn btn-sm" id="geo-approve-all">Approve all</button>
+                                <button class="btn btn-sm btn-primary" id="geo-import">Import approved</button>
+                            </div>
+                            <div class="photo-help">Faded photos on the map come from their GPS tags. Tick the ones that belong on this plan. Only ticked photos are imported onto the plan, and only after you confirm the placement.</div>
+                            <div id="geo-list"></div>
+                        </div>
+                    </aside>
                 </div>
             </main>
 
@@ -584,7 +658,7 @@
                 </div>
                 <label class="check"><input type="checkbox" id="plain-downloads-toggle"> Always use plain browser downloads for Save and Download photos (skip the save/folder dialogs)</label>
             </div>
-            <p class="modal-note">All data stays on this device. No network access.</p>
+            <p class="modal-note">Your plan and photos stay on this device. The Map view loads OpenStreetMap tiles for the area you look at; nothing else is sent.</p>
             <div class="modal-buttons">
                 <button class="btn" onclick="closeSettings()">Close</button>
             </div>
@@ -659,6 +733,9 @@
         let nextTagId = 1;
         let activeTab = null;     // tag id of the tab being viewed; null = all photos
         let selectedPhotoId = null;
+        let geo = null;               // map placement of the plan: { lat, lng, ratio, rot, opacity, show, confirmed }
+        let geoMap = null, geoCanvas = null, geoPhotoLayer = null, overlayImg = null, overlayBusy = false, geoPicking = false;
+        const geoApproved = new Set();   // photo ids ticked for import
         let visMode = 'or';           // plan visibility on the base layer: 'or' or 'and'
         let hiddenTags = new Set();   // tag ids switched off (new tags are on by default)
         let showUntagged = true;
@@ -716,6 +793,7 @@
             const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
             pdfBytes = bytes;
             pdfDoc = doc;
+            overlayImg = null;
             pdfName = name;
             currentPage = 1;
             const vp = (await pdfDoc.getPage(currentPage)).getViewport({ scale: 1 });
@@ -1403,6 +1481,296 @@
             if (e.key === 'Escape' && selectedPhotoId !== null && !document.querySelector('.modal.active')) selectPhoto(null);
         });
 
+        // ---------- Map view: the plan placed on OpenStreetMap, geotagged photos ----------
+        // Placement = centre point + drawing scale + rotation. Plan "up" (top edge) points at `rot` degrees clockwise from north.
+        const M_PER_PAPER_PT = 0.0254 / 72;        // one PDF point on paper, in metres
+        const mPerDegLat = 111320;
+        const mPerDegLng = () => 111320 * Math.cos(geo.lat * Math.PI / 180);
+        const metresPerPt = () => geo.ratio * M_PER_PAPER_PT;   // real metres per plan unit at this scale
+
+        function planToLatLng(x, y) {
+            const k = metresPerPt();
+            const dx = (x - pageW / 2) * k, dy = (y - pageH / 2) * k;
+            const b = geo.rot * Math.PI / 180;
+            const E = dx * Math.cos(b) - dy * Math.sin(b);
+            const N = -dx * Math.sin(b) - dy * Math.cos(b);
+            return { lat: geo.lat + N / mPerDegLat, lng: geo.lng + E / mPerDegLng() };
+        }
+        function latLngToPlan(lat, lng) {
+            const k = metresPerPt();
+            const E = (lng - geo.lng) * mPerDegLng(), N = (lat - geo.lat) * mPerDegLat;
+            const b = geo.rot * Math.PI / 180;
+            const dx = E * Math.cos(b) - N * Math.sin(b);
+            const dy = -E * Math.sin(b) - N * Math.cos(b);
+            return { x: pageW / 2 + dx / k, y: pageH / 2 + dy / k };
+        }
+        const insidePlan = (pt) => pt.x >= 0 && pt.x <= pageW && pt.y >= 0 && pt.y <= pageH;
+
+        // The page drawn once at a sensible size, used as the overlay image.
+        async function ensureOverlayImage() {
+            if (overlayImg || !pdfDoc || overlayBusy) return overlayImg;
+            overlayBusy = true;
+            try {
+                const page = await pdfDoc.getPage(currentPage);
+                const vp = page.getViewport({ scale: Math.min(3, 2400 / pageW) });
+                const c = document.createElement('canvas');
+                c.width = Math.round(vp.width);
+                c.height = Math.round(vp.height);
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                overlayImg = c;
+            } finally {
+                overlayBusy = false;
+            }
+            return overlayImg;
+        }
+
+        function ensureGeo() {
+            if (geo) return;
+            const c = geoMap ? geoMap.getCenter() : { lat: 0, lng: 0 };
+            geo = { lat: c.lat, lng: c.lng, ratio: 100, rot: 0, opacity: 0.6, show: true, confirmed: false };
+        }
+        function setGeo(patch, resetConfirm = true) {
+            ensureGeo();
+            Object.assign(geo, patch);
+            if (resetConfirm && ['lat', 'lng', 'ratio', 'rot'].some((k) => k in patch)) geo.confirmed = false;
+            syncGeoInputs();
+            drawOverlay();
+            renderGeoList();
+            scheduleAutosave();
+        }
+
+        // Draws the plan image with an affine transform from three corners, so rotation and scale come out right.
+        function drawOverlay() {
+            if (!geoMap) return;
+            const size = geoMap.getSize();
+            geoCanvas.width = size.x;
+            geoCanvas.height = size.y;
+            L.DomUtil.setPosition(geoCanvas, geoMap.containerPointToLayerPoint([0, 0]));
+            const ctx = geoCanvas.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, size.x, size.y);
+            updateGeoReadout();
+            if (!geo || !geo.show || !pdfDoc) return;
+            if (!overlayImg) { ensureOverlayImage().then(drawOverlay); return; }
+            const P = (x, y) => geoMap.latLngToContainerPoint(planToLatLng(x, y));
+            const p0 = P(0, 0), p1 = P(pageW, 0), p2 = P(0, pageH), p3 = P(pageW, pageH);
+            const W = overlayImg.width, H = overlayImg.height;
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalAlpha = geo.opacity;
+            ctx.setTransform((p1.x - p0.x) / W, (p1.y - p0.y) / W, (p2.x - p0.x) / H, (p2.y - p0.y) / H, p0.x, p0.y);
+            ctx.drawImage(overlayImg, 0, 0);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#B76556';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p2.x, p2.y);
+            ctx.closePath();
+            ctx.stroke();
+            // mark the top edge so orientation is obvious
+            ctx.fillStyle = '#B76556';
+            ctx.font = '600 12px "IBM Plex Mono", monospace';
+            ctx.fillText('TOP OF PLAN', (p0.x + p1.x) / 2 + 6, (p0.y + p1.y) / 2 - 8);
+        }
+
+        function syncGeoInputs() {
+            const v = (id, val) => { const el = document.getElementById(id); if (document.activeElement !== el) el.value = val; };
+            const g = geo || { lat: '', lng: '', ratio: 100, rot: 0, opacity: 0.6, show: true };
+            v('geo-ratio', g.ratio);
+            v('geo-rot', g.rot);
+            v('geo-rot-slider', Math.max(-180, Math.min(180, g.rot)));
+            v('geo-lat', geo ? geo.lat.toFixed(6) : '');
+            v('geo-lng', geo ? geo.lng.toFixed(6) : '');
+            v('geo-opacity', g.opacity);
+            document.getElementById('geo-show').checked = g.show;
+            updateGeoReadout();
+        }
+
+        function updateGeoReadout() {
+            const status = document.getElementById('geo-status');
+            const box = document.getElementById('geo-readout');
+            const btnPick = document.getElementById('geo-pick');
+            btnPick.classList.toggle('active', geoPicking);
+            if (!pdfDoc) {
+                status.textContent = 'Load a plan in Plan view first';
+                status.className = 'geo-status warn';
+                box.textContent = 'The plan is needed to place it on the map.';
+                return;
+            }
+            if (!geo) {
+                status.textContent = 'Not placed';
+                status.className = 'geo-status warn';
+                box.textContent = 'Set the centre (click the map, or use the map view), then the scale and rotation.';
+                return;
+            }
+            const k = metresPerPt();
+            box.textContent = `Plan is ${(pageW * k).toFixed(1)} m wide and ${(pageH * k).toFixed(1)} m high at 1:${geo.ratio}. Top of plan points ${((geo.rot % 360) + 360) % 360}° clockwise from north.`;
+            status.textContent = geo.confirmed ? 'Placement confirmed' : 'Not confirmed yet';
+            status.className = 'geo-status ' + (geo.confirmed ? 'ok' : 'warn');
+        }
+
+        function initMap() {
+            if (geoMap) { geoMap.invalidateSize(); return; }
+            const last = photos.filter((p) => p.gps).pop();
+            const start = geo ? [geo.lat, geo.lng] : last ? [last.gps.lat, last.gps.lon] : [20, 0];
+            geoMap = L.map('map', { worldCopyJump: true }).setView(start, geo || last ? 17 : 2);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(geoMap);
+            L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(geoMap);
+            geoCanvas = document.createElement('canvas');
+            geoCanvas.className = 'plan-overlay-canvas';
+            geoMap.getPane('overlayPane').appendChild(geoCanvas);
+            geoPhotoLayer = L.layerGroup().addTo(geoMap);
+            geoMap.on('move zoom viewreset resize moveend zoomend', drawOverlay);
+            geoMap.on('click', (e) => {
+                if (!geoPicking) return;
+                geoPicking = false;
+                setGeo({ lat: e.latlng.lat, lng: e.latlng.lng });
+                showToast('Centre set. Now check the scale and rotation.');
+            });
+            syncGeoInputs();
+            renderGeoPhotos();
+            renderGeoList();
+            drawOverlay();
+        }
+
+        function setView(v) {
+            const onMap = v === 'map';
+            document.body.classList.toggle('map-mode', onMap);
+            document.getElementById('canvas-wrapper').hidden = onMap;
+            document.getElementById('map-view').hidden = !onMap;
+            document.getElementById('view-plan').classList.toggle('active', !onMap);
+            document.getElementById('view-map').classList.toggle('active', onMap);
+            if (onMap) { initMap(); setTimeout(() => geoMap && geoMap.invalidateSize(), 0); }
+        }
+
+        // Geotagged photos: faded until approved; an approved photo is drawn in full with a blue frame.
+        function renderGeoPhotos() {
+            if (!geoMap) return;
+            geoPhotoLayer.clearLayers();
+            photos.filter((p) => p.gps).forEach((p) => {
+                const ok = geoApproved.has(p.id);
+                const m = L.marker([p.gps.lat, p.gps.lon], {
+                    icon: L.divIcon({
+                        className: 'geo-photo' + (ok ? ' approved' : ''),
+                        html: p.thumb ? `<img src="${p.thumb}" alt="">` : escapeHtml(p.name),
+                        iconSize: [56, 42],
+                        iconAnchor: [28, 21]
+                    }),
+                    opacity: ok ? 1 : 0.35,
+                    title: p.name
+                });
+                m.on('click', () => setApproved(p.id, !geoApproved.has(p.id)));
+                m.addTo(geoPhotoLayer);
+            });
+        }
+
+        function setApproved(id, on) {
+            if (on) geoApproved.add(id); else geoApproved.delete(id);
+            renderGeoPhotos();
+            renderGeoList();
+        }
+
+        function renderGeoList() {
+            const list = photos.filter((p) => p.gps);
+            document.getElementById('geo-count').textContent = list.length ? `(${list.length} of ${photos.length})` : '';
+            document.getElementById('geo-list').innerHTML = list.map((p) => {
+                const pt = geo && pdfDoc ? latLngToPlan(p.gps.lat, p.gps.lon) : null;
+                const where = !pt ? 'place the plan first' : insidePlan(pt) ? 'inside the plan' : 'outside the plan (cannot import)';
+                const thumb = p.thumb ? `<img src="${p.thumb}" alt="">` : '';
+                return `<label class="geo-row ${pt && insidePlan(pt) ? '' : 'outside'}">
+                    <input type="checkbox" ${geoApproved.has(p.id) ? 'checked' : ''} onchange="setApproved(${p.id}, this.checked)">
+                    ${thumb}
+                    <span><b>${escapeHtml(p.name)}</b><br><span class="label">${escapeHtml(where)}</span></span>
+                </label>`;
+            }).join('') || '<p class="empty-note">No geotagged photos found. Press Scan after loading photos.</p>';
+            document.getElementById('geo-approve-all').disabled = !list.length;
+        }
+
+        function importApproved() {
+            if (!geo || !geo.confirmed) return showToast('Confirm the plan placement first');
+            let n = 0, outside = 0;
+            photos.forEach((p) => {
+                if (!geoApproved.has(p.id) || !p.gps) return;
+                const pt = latLngToPlan(p.gps.lat, p.gps.lon);
+                if (!insidePlan(pt)) { outside++; return; }
+                p.pos = { x: pt.x, y: pt.y };
+                geoApproved.delete(p.id);
+                n++;
+            });
+            if (!n && !outside) return showToast('Tick the photos to import first');
+            updatePhotoGrid();
+            renderGeoPhotos();
+            renderGeoList();
+            showToast(`Imported ${n} photo${n === 1 ? '' : 's'} onto the plan${outside ? `; ${outside} outside the plan were not imported` : ''}`);
+        }
+
+        // Wiring
+        document.getElementById('view-plan').addEventListener('click', () => setView('plan'));
+        document.getElementById('view-map').addEventListener('click', () => setView('map'));
+        ['geo-ratio', 'geo-rot', 'geo-lat', 'geo-lng'].forEach((id) => document.getElementById(id).addEventListener('change', (e) => {
+            const f = { 'geo-ratio': 'ratio', 'geo-rot': 'rot', 'geo-lat': 'lat', 'geo-lng': 'lng' }[id];
+            const val = parseFloat(e.target.value);
+            if (!isFinite(val)) return;
+            if (f === 'ratio' && val < 1) return;
+            ensureGeo();
+            setGeo({ [f]: val });
+        }));
+        document.getElementById('geo-rot-slider').addEventListener('input', (e) => {
+            ensureGeo();
+            setGeo({ rot: +e.target.value });
+        });
+        document.getElementById('geo-opacity').addEventListener('input', (e) => { ensureGeo(); setGeo({ opacity: +e.target.value }, false); });
+        document.getElementById('geo-show').addEventListener('change', (e) => { ensureGeo(); setGeo({ show: e.target.checked }, false); });
+        document.getElementById('geo-goto').addEventListener('click', () => {
+            if (!geoMap || !geo) return showToast('Place the plan first');
+            geoMap.setView([geo.lat, geo.lng], 17);
+        });
+        document.getElementById('geo-use-view').addEventListener('click', () => {
+            if (!geoMap) return;
+            const c = geoMap.getCenter();
+            ensureGeo();
+            setGeo({ lat: c.lat, lng: c.lng });
+        });
+        document.getElementById('geo-pick').addEventListener('click', () => {
+            geoPicking = !geoPicking;
+            showToast(geoPicking ? 'Click the map where the plan centre should be' : 'Centre picking off');
+            updateGeoReadout();
+        });
+        document.getElementById('geo-confirm').addEventListener('click', () => {
+            if (!geo || !pdfDoc) return showToast('Place the plan first');
+            geo.confirmed = true;
+            updateGeoReadout();
+            renderGeoList();
+            scheduleAutosave();
+            showToast('Placement confirmed. Tick photos, then Import approved.');
+        });
+        document.getElementById('geo-clear').addEventListener('click', () => {
+            if (!geo) return;
+            if (!confirm('Remove the plan placement on the map? Photos already imported stay where they are.')) return;
+            geo = null;
+            geoApproved.clear();
+            syncGeoInputs();
+            drawOverlay();
+            renderGeoPhotos();
+            renderGeoList();
+            scheduleAutosave();
+        });
+        document.getElementById('geo-scan').addEventListener('click', () => {
+            const n = photos.filter((p) => p.gps).length;
+            renderGeoPhotos();
+            renderGeoList();
+            showToast(`${n} of ${photos.length} photo${photos.length === 1 ? '' : 's'} have a geotag`);
+        });
+        document.getElementById('geo-approve-all').addEventListener('click', () => {
+            photos.filter((p) => p.gps).forEach((p) => geoApproved.add(p.id));
+            renderGeoPhotos();
+            renderGeoList();
+        });
+        document.getElementById('geo-import').addEventListener('click', importApproved);
+
         // ---------- Regions ----------
         function pointInPolygon(x, y, pts) {
             let inside = false;
@@ -1693,8 +2061,9 @@
         // ---------- Photos: sidebar ----------
         function updatePhotoGrid() {
             photos.sort((a, b) => a.timestamp - b.timestamp);
+            const geotagged = photos.filter((p) => p.gps).length;
             document.getElementById('photo-count').textContent = photos.length
-                ? `(${photos.filter((p) => p.pos).length} placed / ${photos.length})` : '';
+                ? `(${photos.filter((p) => p.pos).length} placed / ${photos.length}${geotagged ? `, ${geotagged} geotagged` : ''})` : '';
 
             const shown = photos.filter(isShown);
             const grid = document.getElementById('photo-grid');
@@ -1723,6 +2092,7 @@
             }
             renderSchemes();
             renderVisibility();
+            if (geoMap) { renderGeoPhotos(); renderGeoList(); }
             renderTags();
             renderTabs();
             renderInspector();
@@ -2182,6 +2552,7 @@
                 schemes: schemes.map((s) => ({ id: s.id, name: s.name, regions: s.regions.map(regionJson) })),
                 tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color, tab: !!t.tab })),
                 visibility: { mode: visMode, untagged: showUntagged, hidden_tags: [...hiddenTags] },
+                geo: geo ? { lat: round(geo.lat * 1e6) / 1e6, lng: round(geo.lng * 1e6) / 1e6, ratio: geo.ratio, rot: geo.rot, opacity: geo.opacity, show: !!geo.show, confirmed: !!geo.confirmed } : null,
                 annotations: annotations.map((a) => (a.type === 'note'
                     ? { id: a.id, type: 'note', x: round(a.x), y: round(a.y), text: a.text }
                     : a.type === 'arrow'
@@ -2240,6 +2611,9 @@
                 id: t.id, name: String(t.name), color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : TAG_COLORS[i % TAG_COLORS.length], tab: !!t.tab
             }));
             nextTagId = tags.reduce((m, t) => Math.max(m, t.id), 0) + 1;
+            geo = json.geo ? { ...json.geo } : null;
+            geoApproved.clear();
+            geoPicking = false;
             visMode = json.visibility && json.visibility.mode === 'and' ? 'and' : 'or';
             showUntagged = !json.visibility || json.visibility.untagged !== false;
             hiddenTags = new Set((json.visibility && json.visibility.hidden_tags || []).filter((id) => tags.some((t) => t.id === id)));
@@ -2294,6 +2668,8 @@
             nextPhotoId = photos.reduce((m, p) => Math.max(m, p.id), 0) + 1;
             updateRegionsList();
             redrawAnnotations();
+            syncGeoInputs();
+            drawOverlay();
             unsavedChanges = false;
             lastSave = null;
             renderSaveStatus();

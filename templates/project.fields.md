@@ -28,6 +28,8 @@ On **Open JSON** the app asks you to choose the folder (or files). Each asset is
 | `active_scheme` | `id` of the scheme shown on the plan and used for photo locations. |
 | `tags[]` | Tags: `id`, `name`, `color` (`#rrggbb`), `tab` (true = shown as a tab above the plan). |
 | `annotations[]` | Markup. `type` is `note` (`x`, `y`, `text`), `arrow` (`x1`, `y1` tail, `x2`, `y2` point) or `cloud` (`x`, `y`, `width`, `height`). Optional; older files without it open fine. |
+| `visibility` | Base-layer plan visibility: `mode` (`or` or `and`), `untagged` (show untagged photos), `hidden_tags[]` (tag ids switched off). |
+| `geo` | Plan placement on the map, or null: `lat`, `lng` (centre of the plan), `ratio` (drawing scale 1:N), `rot` (degrees clockwise from north for the top of the plan), `opacity`, `show`, `confirmed`. Lat/lng is in degrees (WGS84). |
 | `embedded` | Optional. Makes the file self-contained: `plan` is a data URI for the plan (PDF, JPG or PNG; an image becomes a one-page PDF) and `photos[]` has one data URI per entry in `photos[]`, same order. Files with `embedded` open directly, with no link step. The app never writes this field itself. |
 | `import_batches[]` | Each time photos were loaded: `batch` number, `imported_at`, `source` (`files` or `folder`), `photo_count`. |
 | `photos[].id` | Stable number for the photo within this project. |
