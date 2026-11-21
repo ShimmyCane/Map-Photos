@@ -22,6 +22,8 @@ Legend: [x] built and checked in headless Edge · [ ] not built · [?] built, ne
 - [x] Chronological order
 - [x] Small thumbnails in the side panel
 - [x] Drag a photo anywhere on the plan (no region needed); drag the marker to move; double-click to remove
+- [x] Drop image files straight from the desktop onto the plan: imported and placed where dropped
+- [x] Key numbers: a placed photo shows on the plan as a numbered circle (1, 2, 3 ...); hover the circle to see the photo. Number kept in the JSON as `key`; on the PDF the number is in each photo's caption
 - [x] Marker size scales with zoom; ⚙️ Settings (toolbar button or corner gear) has a live size slider for all photos, even after they are placed, plus Reset. Saved in the project JSON
 - [x] Load a folder of photos (keeps relative paths) as well as individual files; each load is recorded as an import batch
 - [x] Region tag comes from where the photo sits (shown as the region name, "on plan", or "not placed")
@@ -48,8 +50,12 @@ Legend: [x] built and checked in headless Edge · [ ] not built · [?] built, ne
 - [ ] Warn when a linked file's size differs from the JSON (file edited since)
 
 ## Step 4: PDF with photos
-- [x] Download PDF with photos embedded at their locations, plus region outlines/labels and a "Region | time" caption
-- [x] Round-trip checked: exported PDF reopens with 3 images in the right place
+- [x] Download PDF with photos at their locations, plus region outlines/labels and a "Region | time" caption
+- [x] Each photo is a PDF Stamp annotation (its own movable object with the JPEG, frame and caption), not drawn into the page; the plan stays as-is underneath
+- [ ] Region outlines, labels and markup (notes, arrows, clouds) are still drawn into the page, so they are not selectable in Bluebeam
+- [?] Open the exported PDF in Bluebeam/Acrobat and confirm a photo stamp can be selected, moved, resized and deleted
+- [x] Round-trip checked before photos became annotations: exported PDF reopened with 3 images in the right place
+- [ ] Re-check the round trip with photo annotations (reopen the exported PDF)
 - [ ] Option for full-size photos (currently re-encoded to max 1600 px to keep the file a sensible size)
 - [x] 🖼️ Download photos: every photo on the plan, renamed `RegionName_##` (numbered by time taken within each region; `NoRegion_##` outside any region), plus `_manifest.csv` mapping new name to original name, region, time, GPS and plan position. Chrome/Edge: pick a folder (a new timestamped sub-folder is made, nothing overwritten); otherwise, or via Settings, a ZIP
 - [?] HEIC photos download as the converted JPEG (EXIF is not carried into the JPEG; the manifest keeps time/GPS)

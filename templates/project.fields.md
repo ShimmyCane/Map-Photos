@@ -44,4 +44,5 @@ On **Open JSON** the app asks you to choose the folder (or files). Each asset is
 | `photos[].camera` | Camera make/model from EXIF, or `null`. |
 | `photos[].aspect_ratio` | Width / height after rotation. Keeps the marker shape if the file is missing. |
 | `photos[].placed`, `position` | Whether it is on the plan, and its centre `{x, y}`. |
+| `photos[].key` | Key number (1, 2, 3 ...) shown on the plan as a circle. Given on first placement and kept if the photo is taken off and put back. Older files get numbers in time order. `null` if never placed. |
 | `photos[].region`, `region_id` | Informational: the region its position falls inside, or `null`. Recomputed on open from `position`, so editing these has no effect. |

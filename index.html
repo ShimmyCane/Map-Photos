@@ -106,6 +106,8 @@
         .photo-marker img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
         .photo-marker .photo-fallback { background: var(--tracing); }
         .photo-marker.flash { outline: 2px solid var(--ochre); outline-offset: 2px; }
+        .photo-marker.key-marker { border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--sheet); border-color: var(--sheet); box-shadow: 0 0 0 1px var(--ink); font-family: var(--font-mono, monospace); font-weight: 600; line-height: 1; user-select: none; }
+        .photo-marker.key-marker span { pointer-events: none; }
         .photo-marker.dragging { cursor: grabbing; z-index: 50; box-shadow: var(--shadow-sheet); }
         .tool-active .photo-marker { pointer-events: none; }
 
@@ -217,6 +219,7 @@
             color: var(--pencil);
         }
         .photo-tag.region { border: 1px solid var(--blue); background: var(--blue-wash); color: var(--ink); }
+        .photo-tag.key { border: 1px solid var(--ink); background: var(--ink); color: var(--sheet); }
         .photo-tag.onplan { border: 1px solid var(--border-dark); background: var(--sheet); color: var(--graphite); }
 
         /* Footer status bar */
@@ -769,6 +772,7 @@
         let currentAnn = null;    // markup being dragged out
         let pendingNote = null;   // { id|null, x, y } while the note dialog is open
         let photos = [];
+        let nextKeyNo = 1;        // next key number to hand out (1, 2, 3 ...)
         let nextRegionId = 1;
         let nextPhotoId = 1;
         let selectedRegionFilters = new Set();
@@ -1205,11 +1209,11 @@
         const tabOK = (p) => activeTab === null || (p.tags || []).includes(activeTab);
 
         // Frame colour for the PDF export: the first tag's colour, else the default ink.
-        function pdfColorOf(p, fallback) {
+        function tagRgbArr(p, fallback) {
             const t = tagsFor(p)[0];
             if (!t) return fallback;
             const n = parseInt(t.color.slice(1), 16);
-            return PDFLib.rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+            return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
         }
 
         // Switching scheme swaps which set of regions is drawn and used for photo locations.
@@ -2237,12 +2241,14 @@
                     camera: exif.camera,
                     pos: null,
                     tags: [],
+                    key: null,
                     missing: false
                 }
             };
         }
 
-        async function importPhotos(files, source) {
+        // placeAt (plan point, optional): photos dropped on the plan are placed there, offset a little each
+        async function importPhotos(files, source, placeAt = null) {
             if (!files.length) return;
             const batch = { batch: importBatches.length + 1, imported_at: Date.now(), source, photo_count: files.length };
             importBatches.push(batch);
@@ -2253,6 +2259,10 @@
                 if (!ok) failed++;
                 photo.batch = batch.batch;
                 photo.importedAt = batch.imported_at;
+                if (placeAt && pdfDoc) {
+                    const step = pageW * 0.02;
+                    placePhoto(photo, { x: placeAt.x + i * step, y: placeAt.y + i * step });
+                }
                 photos.push(photo);
                 updatePhotoGrid();
             }
@@ -2298,6 +2308,7 @@
                     const tag = r
                         ? `<span class="photo-tag region" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</span>`
                         : p.pos ? '<span class="photo-tag onplan">on plan</span>' : '<span class="photo-tag">not placed</span>';
+                    const keyTag = p.key ? `<span class="photo-tag key">#${p.key}</span> ` : '';
                     const body = p.thumb
                         ? `<img src="${p.thumb}" alt="${escapeHtml(p.name)}">`
                         : `<div class="photo-fallback"><div>${escapeHtml(p.name)}${p.missing ? '<br><b>file missing</b>' : ''}</div></div>`;
@@ -2308,7 +2319,7 @@
                         <div class="photo-card ${p.pos ? 'placed' : ''} ${p.id === selectedPhotoId ? 'selected' : ''}" draggable="true" data-id="${p.id}">
                             <div class="photo-thumbnail">${body}</div>
                             <div class="photo-info">${when}</div>
-                            ${tag}${chips}
+                            ${keyTag}${tag}${chips}
                         </div>`;
                 }).join('');
             }
@@ -2356,20 +2367,29 @@
         });
 
         // ---------- Photos: placing on the plan ----------
+        const isImageFile = (f) => f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp|gif|bmp)$/i.test(f.name);
+        const dragHasFiles = (e) => Array.from(e.dataTransfer.types || []).includes('Files');
+
         container.addEventListener('dragover', (e) => {
-            if (draggedPhotoId === null) return;
+            if (draggedPhotoId === null && !dragHasFiles(e)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
         });
 
         container.addEventListener('drop', (e) => {
-            if (draggedPhotoId === null) return;
+            if (draggedPhotoId === null) {
+                // Image files dragged in from the desktop: import them and place them where they were dropped
+                const files = Array.from(e.dataTransfer.files || []).filter(isImageFile);
+                if (!files.length) return;
+                e.preventDefault();
+                importPhotos(files, 'drop', pdfDoc ? toPlan(e) : null);
+                return;
+            }
             e.preventDefault();
             const p = photos.find((p) => p.id === draggedPhotoId);
             draggedPhotoId = null;
             if (!p || !pdfDoc) return;
-            const pt = toPlan(e);
-            p.pos = clampToPage(pt);
+            placePhoto(p, toPlan(e));
             updatePhotoGrid();
         });
 
@@ -2377,26 +2397,52 @@
             return { x: Math.min(pageW, Math.max(0, pt.x)), y: Math.min(pageH, Math.max(0, pt.y)) };
         }
 
+        // First placement gives a photo its key number; the number stays with the photo after that
+        function placePhoto(p, pt) {
+            p.pos = clampToPage(pt);
+            if (!p.key) p.key = nextKeyNo++;
+        }
+
+        // Photo size (used for the PDF image)
         function markerSize(p) {
             const side = pageW * (photoSizePct / 100);
             return p.aspect >= 1 ? { w: side, h: side / p.aspect } : { w: side * p.aspect, h: side };
         }
 
+        // On screen a placed photo is a numbered circle; hovering it shows the photo
+        function keyDiameter() {
+            return pageW * (photoSizePct / 100) * 0.6;
+        }
+
+        function screenSize(p) {
+            if (!p.key) return markerSize(p);
+            const d = keyDiameter();
+            return { w: d, h: d };
+        }
+
         function placeMarkerEl(el, p) {
-            const { w, h } = markerSize(p);
+            const { w, h } = screenSize(p);
             el.style.width = w * zoomLevel + 'px';
             el.style.height = h * zoomLevel + 'px';
             el.style.left = (p.pos.x - w / 2) * zoomLevel + 'px';
             el.style.top = (p.pos.y - h / 2) * zoomLevel + 'px';
+            if (p.key) el.style.fontSize = Math.max(7, h * zoomLevel * 0.5) + 'px';
         }
 
         function renderMarkers() {
             markerLayer.innerHTML = '';
             photos.filter((p) => p.pos && isShown(p) && tabOK(p) && visOK(p)).forEach((p) => {
                 const el = document.createElement('div');
-                el.className = 'photo-marker' + (p.id === selectedPhotoId ? ' selected' : '');
                 el.dataset.id = p.id;
-                el.innerHTML = p.thumb ? `<img src="${p.thumb}" alt="">` : `<div class="photo-fallback">${escapeHtml(p.name)}</div>`;
+                const selCls = p.id === selectedPhotoId ? ' selected' : '';
+                if (p.key) {
+                    el.className = 'photo-marker key-marker' + selCls;
+                    el.title = `${p.key} · ${p.name}`;
+                    el.innerHTML = `<span>${p.key}</span>`;
+                } else {
+                    el.className = 'photo-marker' + selCls;
+                    el.innerHTML = p.thumb ? `<img src="${p.thumb}" alt="">` : `<div class="photo-fallback">${escapeHtml(p.name)}</div>`;
+                }
                 const first = tagsFor(p)[0];
                 if (first) el.style.outline = `3px solid ${first.color}`;
                 placeMarkerEl(el, p);
@@ -2502,6 +2548,40 @@
 
         const latin = (s) => String(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 
+        // A placed photo is written as a Stamp annotation, not drawn into the page, so it stays its own object:
+        // Bluebeam or Acrobat can select, move, resize and delete it without touching the plan. The annotation's
+        // appearance (frame, JPEG, caption plate) lives in its own form XObject, so every viewer draws it the same.
+        function addPhotoStamp(doc, page, o) {
+            const { img, x, y, w, h, cap, cs, cw, font, lw, frame, plate, ink, title, contents, name } = o;
+            const pad = lw * 1.5;
+            const capH = cs + 5;
+            const cx = x + w / 2;
+            const boxW = Math.max(w + pad * 2, cw + 6);
+            const left = cx - boxW / 2, right = cx + boxW / 2;
+            const bottom = y - capH - pad, top = y + h + pad;
+            const hex = (s) => Array.from(s, (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+            const rgbOp = (c) => c.join(' ');
+            const ops = [
+                `${rgbOp(frame)} rg ${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2} re f`,
+                `q ${w} 0 0 ${h} ${x} ${y} cm /Im0 Do Q`,
+                `${rgbOp(plate)} rg ${rgbOp(ink)} RG ${lw * 0.5} w ${cx - cw / 2 - 3} ${y - cs - 5} ${cw + 6} ${cs + 4} re B`,
+                `BT /F1 ${cs} Tf ${rgbOp(ink)} rg ${cx - cw / 2} ${y - cs - 2} Td <${hex(cap)}> Tj ET`
+            ].join('\n');
+            const resources = doc.context.obj({ XObject: { Im0: img.ref }, Font: { F1: font.ref } });
+            const appearance = doc.context.register(doc.context.flateStream(new TextEncoder().encode(ops), {
+                Type: 'XObject', Subtype: 'Form', BBox: [left, bottom, right, top], Resources: resources
+            }));
+            const annot = doc.context.obj({
+                Type: 'Annot', Subtype: 'Stamp', Rect: [left, bottom, right, top], F: 4, P: page.ref,
+                AP: { N: appearance },
+                T: PDFLib.PDFHexString.fromText(title),
+                Subj: PDFLib.PDFHexString.fromText('Photo'),
+                Contents: PDFLib.PDFHexString.fromText(contents),
+                NM: PDFLib.PDFHexString.fromText(name)
+            });
+            page.node.addAnnot(doc.context.register(annot));
+        }
+
         async function downloadPdf() {
             if (!pdfBytes) return showToast('Load a PDF first');
             const btn = document.getElementById('download-btn');
@@ -2564,18 +2644,24 @@
                 });
 
                 const placed = photos.filter((p) => p.pos && p.preview);
-                for (const p of placed) {
+                const frameRgb = [0.22, 0.22, 0.2], plateRgb = [0.98, 0.973, 0.949];
+                for (const [i, p] of placed.entries()) {
                     const img = await doc.embedJpg(await jpegBytesFor(p.image, 1600));
                     const { w, h } = markerSize(p);
                     const x = X(p.pos.x - w / 2), y = Y(p.pos.y + h / 2);
-                    page.drawRectangle({ x: x - lw * 1.5, y: y - lw * 1.5, width: w + lw * 3, height: h + lw * 3, color: pdfColorOf(p, textInk) });
-                    page.drawImage(img, { x, y, width: w, height: h });
                     const r = regionOf(p);
-                    const cap = latin(`${r ? r.label + ' | ' : ''}${new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' })}`);
+                    const time = new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' });
+                    const keyPart = p.key ? `#${p.key} | ` : '';
+                    const cap = latin(`${keyPart}${r ? r.label + ' | ' : ''}${time}`);
                     const cs = Math.max(5, Math.min(fs * 0.8, w / 6));
                     const cw = font.widthOfTextAtSize(cap, cs);
-                    page.drawRectangle({ x: x + w / 2 - cw / 2 - 2, y: y - cs - 4, width: cw + 4, height: cs + 3, color: sheetFill, opacity: 0.92 });
-                    page.drawText(cap, { x: x + w / 2 - cw / 2, y: y - cs - 2, size: cs, font, color: textInk });
+                    addPhotoStamp(doc, page, {
+                        img, x, y, w, h, cap, cs, cw, font, lw,
+                        frame: tagRgbArr(p, frameRgb), plate: plateRgb, ink: frameRgb,
+                        title: 'Map Photos',
+                        contents: `${keyPart}${r ? r.label + ' | ' : ''}${time} | ${p.name}`,
+                        name: `mapphotos-${timeStamp()}-${i + 1}`
+                    });
                 }
 
                 const out = await doc.save();
@@ -2590,7 +2676,7 @@
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 10000);
                 const skipped = photos.filter((p) => p.pos && !p.preview).length;
-                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'}${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
+                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'} as movable annotations${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
             } catch (err) {
                 setSaveStatus('Could not build the PDF: ' + err.message, false);
             } finally {
@@ -2638,9 +2724,9 @@
 
         function manifestCsv(plan) {
             const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-            const rows = [['new_name', 'original_name', 'original_path', 'region', 'taken_at', 'taken_at_source', 'import_batch', 'gps_lat', 'gps_lon', 'plan_x', 'plan_y', 'tags']];
+            const rows = [['new_name', 'original_name', 'original_path', 'key', 'region', 'taken_at', 'taken_at_source', 'import_batch', 'gps_lat', 'gps_lon', 'plan_x', 'plan_y', 'tags']];
             plan.forEach(({ photo: p, region, name }) => rows.push([
-                name, p.name, p.path, region ? region.label : '', iso(p.timestamp), p.timeFromExif ? 'exif' : 'file_date', p.batch,
+                name, p.name, p.path, p.key || '', region ? region.label : '', iso(p.timestamp), p.timeFromExif ? 'exif' : 'file_date', p.batch,
                 p.gps ? p.gps.lat : '', p.gps ? p.gps.lon : '', Math.round(p.pos.x * 100) / 100, Math.round(p.pos.y * 100) / 100,
                 tagsFor(p).map((t) => t.name).join('; ')
             ]));
@@ -2803,6 +2889,7 @@
                         aspect_ratio: round(p.aspect),
                         placed: !!p.pos,
                         position: p.pos ? { x: round(p.pos.x), y: round(p.pos.y) } : null,
+                        key: p.key || null,
                         region: r ? r.label : null,
                         region_id: r ? r.id : null,
                         tags: (p.tags || []).slice()
@@ -2889,10 +2976,13 @@
                     camera: jp.camera !== undefined ? jp.camera : (loaded ? loaded.camera : null),
                     pos: jp.position ? { x: jp.position.x, y: jp.position.y } : null,
                     tags: (jp.tags || []).filter((id) => tags.some((t) => t.id === id)),
+                    key: Number.isInteger(jp.key) && jp.key > 0 ? jp.key : null,
                     missing: !image
                 });
             }
             nextPhotoId = photos.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+            nextKeyNo = photos.reduce((m, p) => Math.max(m, p.key || 0), 0) + 1;
+            photos.forEach((p) => { if (p.pos && !p.key) p.key = nextKeyNo++; });  // older files: number placed photos in time order
             updateRegionsList();
             redrawAnnotations();
             syncGeoInputs();
