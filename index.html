@@ -2548,38 +2548,82 @@
 
         const latin = (s) => String(s).replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
 
-        // A placed photo is written as a Stamp annotation, not drawn into the page, so it stays its own object:
-        // Bluebeam or Acrobat can select, move, resize and delete it without touching the plan. The annotation's
-        // appearance (frame, JPEG, caption plate) lives in its own form XObject, so every viewer draws it the same.
-        function addPhotoStamp(doc, page, o) {
-            const { img, x, y, w, h, cap, cs, cw, font, lw, frame, plate, ink, title, contents, name } = o;
-            const pad = lw * 1.5;
-            const capH = cs + 5;
-            const cx = x + w / 2;
-            const boxW = Math.max(w + pad * 2, cw + 6);
-            const left = cx - boxW / 2, right = cx + boxW / 2;
-            const bottom = y - capH - pad, top = y + h + pad;
-            const hex = (s) => Array.from(s, (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-            const rgbOp = (c) => c.join(' ');
+        // A numbered dot on the plan, written as a Stamp annotation so Bluebeam or Acrobat can move it
+        function addDotStamp(doc, page, o) {
+            const { cx, cy, r, text, font, fill, numRgb, title, contents, name } = o;
+            const k = 0.5523 * r;
+            const hex = (t) => Array.from(t, (c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+            const fs = r * 1.1;
+            const tw = font.widthOfTextAtSize(text, fs);
             const ops = [
-                `${rgbOp(frame)} rg ${x - pad} ${y - pad} ${w + pad * 2} ${h + pad * 2} re f`,
-                `q ${w} 0 0 ${h} ${x} ${y} cm /Im0 Do Q`,
-                `${rgbOp(plate)} rg ${rgbOp(ink)} RG ${lw * 0.5} w ${cx - cw / 2 - 3} ${y - cs - 5} ${cw + 6} ${cs + 4} re B`,
-                `BT /F1 ${cs} Tf ${rgbOp(ink)} rg ${cx - cw / 2} ${y - cs - 2} Td <${hex(cap)}> Tj ET`
+                `${fill.join(' ')} rg`,
+                `${cx + r} ${cy} m ${cx + r} ${cy + k} ${cx + k} ${cy + r} ${cx} ${cy + r} c ${cx - k} ${cy + r} ${cx - r} ${cy + k} ${cx - r} ${cy} c ${cx - r} ${cy - k} ${cx - k} ${cy - r} ${cx} ${cy - r} c ${cx + k} ${cy - r} ${cx + r} ${cy - k} ${cx + r} ${cy} c f`,
+                `BT /F1 ${fs} Tf ${numRgb.join(' ')} rg ${cx - tw / 2} ${cy - fs * 0.35} Td <${hex(text)}> Tj ET`
             ].join('\n');
-            const resources = doc.context.obj({ XObject: { Im0: img.ref }, Font: { F1: font.ref } });
+            const resources = doc.context.obj({ Font: { F1: font.ref } });
             const appearance = doc.context.register(doc.context.flateStream(new TextEncoder().encode(ops), {
-                Type: 'XObject', Subtype: 'Form', BBox: [left, bottom, right, top], Resources: resources
+                Type: 'XObject', Subtype: 'Form', BBox: [cx - r, cy - r, cx + r, cy + r], Resources: resources
             }));
             const annot = doc.context.obj({
-                Type: 'Annot', Subtype: 'Stamp', Rect: [left, bottom, right, top], F: 4, P: page.ref,
+                Type: 'Annot', Subtype: 'Stamp', Rect: [cx - r, cy - r, cx + r, cy + r], F: 4, P: page.ref,
                 AP: { N: appearance },
                 T: PDFLib.PDFHexString.fromText(title),
-                Subj: PDFLib.PDFHexString.fromText('Photo'),
+                Subj: PDFLib.PDFHexString.fromText('Key dot'),
                 Contents: PDFLib.PDFHexString.fromText(contents),
                 NM: PDFLib.PDFHexString.fromText(name)
             });
             page.node.addAnnot(doc.context.register(annot));
+        }
+
+        // Key page(s) after the plan: each numbered dot sits beside its photo, in number order
+        async function addKeyPages(doc, items, title) {
+            const { StandardFonts, rgb } = PDFLib;
+            const PW = 612, PH = 792, M = 40, HEAD = 56;
+            const reg = await doc.embedFont(StandardFonts.Helvetica);
+            const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+            const ink = rgb(0.22, 0.22, 0.2), sheet = rgb(0.98, 0.973, 0.949), grey = rgb(0.45, 0.45, 0.42);
+            const cols = 2, rows = 3, per = cols * rows;
+            const cellW = (PW - 2 * M) / cols, cellH = (PH - 2 * M - HEAD) / rows;
+            const dot = 30, gap = 12;
+            const photoW = cellW - dot - gap - 12, photoH = cellH - 52;
+            const pages = Math.ceil(items.length / per);
+            let page = null;
+            for (const [i, it] of items.entries()) {
+                const slot = i % per;
+                if (slot === 0) {
+                    page = doc.addPage([PW, PH]);
+                    page.drawText(latin(title), { x: M, y: PH - M - 14, size: 14, font: bold, color: ink });
+                    page.drawText(latin(`Key: numbers match the dots on the plan. Page ${Math.floor(i / per) + 1} of ${pages}`), { x: M, y: PH - M - 30, size: 8, font: reg, color: grey });
+                    page.drawLine({ start: { x: M, y: PH - M - 40 }, end: { x: PW - M, y: PH - M - 40 }, thickness: 0.5, color: grey });
+                }
+                const col = slot % cols, row = Math.floor(slot / cols);
+                const x0 = M + col * cellW;
+                const yTop = PH - M - HEAD - row * cellH;
+                // numbered dot, top-aligned with its photo
+                const cx = x0 + dot / 2, cy = yTop - dot / 2;
+                page.drawCircle({ x: cx, y: cy, size: dot / 2, color: ink });
+                const label = String(it.key), fs = dot * 0.45;
+                page.drawText(label, { x: cx - bold.widthOfTextAtSize(label, fs) / 2, y: cy - fs * 0.35, size: fs, font: bold, color: sheet });
+                // photo, fitted to its box beside the dot
+                const img = await doc.embedJpg(await jpegBytesFor(it.photo.image, 900));
+                const sz = img.scaleToFit(photoW, photoH);
+                const px = x0 + dot + gap, py = yTop - sz.height;
+                page.drawRectangle({ x: px - 1, y: py - 1, width: sz.width + 2, height: sz.height + 2, color: ink });
+                page.drawImage(img, { x: px, y: py, width: sz.width, height: sz.height });
+                // caption under the photo
+                const r = regionOf(it.photo);
+                const when = new Date(it.photo.timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                const lines = [
+                    [`#${it.key}  ${r ? r.label : 'No region'}`, bold, 9, ink],
+                    [when, reg, 8, ink],
+                    [it.photo.name, reg, 7, grey]
+                ];
+                let ly = py - 13;
+                for (const [t, f, size, c] of lines) {
+                    page.drawText(latin(t).slice(0, 70), { x: px, y: ly, size, font: f, color: c });
+                    ly -= size + 4;
+                }
+            }
         }
 
         async function downloadPdf() {
@@ -2643,26 +2687,23 @@
                     }
                 });
 
-                const placed = photos.filter((p) => p.pos && p.preview);
-                const frameRgb = [0.22, 0.22, 0.2], plateRgb = [0.98, 0.973, 0.949];
-                for (const [i, p] of placed.entries()) {
-                    const img = await doc.embedJpg(await jpegBytesFor(p.image, 1600));
-                    const { w, h } = markerSize(p);
-                    const x = X(p.pos.x - w / 2), y = Y(p.pos.y + h / 2);
+                // Richard's version: each placed photo is a numbered dot on the plan (a movable annotation)
+                const dots = photos.filter((p) => p.pos && p.key).sort((a, b) => a.key - b.key);
+                const dotR = keyDiameter() / 2;
+                for (const p of dots) {
                     const r = regionOf(p);
                     const time = new Date(p.timestamp).toLocaleTimeString([], { timeStyle: 'short' });
-                    const keyPart = p.key ? `#${p.key} | ` : '';
-                    const cap = latin(`${keyPart}${r ? r.label + ' | ' : ''}${time}`);
-                    const cs = Math.max(5, Math.min(fs * 0.8, w / 6));
-                    const cw = font.widthOfTextAtSize(cap, cs);
-                    addPhotoStamp(doc, page, {
-                        img, x, y, w, h, cap, cs, cw, font, lw,
-                        frame: tagRgbArr(p, frameRgb), plate: plateRgb, ink: frameRgb,
+                    addDotStamp(doc, page, {
+                        cx: X(p.pos.x), cy: Y(p.pos.y), r: dotR, text: String(p.key), font,
+                        fill: [0.22, 0.22, 0.2], numRgb: [0.98, 0.973, 0.949],
                         title: 'Map Photos',
-                        contents: `${keyPart}${r ? r.label + ' | ' : ''}${time} | ${p.name}`,
-                        name: `mapphotos-${timeStamp()}-${i + 1}`
+                        contents: `${p.key} | ${r ? r.label + ' | ' : ''}${time} | ${p.name}`,
+                        name: `mapphotos-${timeStamp()}-${p.key}`
                     });
                 }
+                // Key page(s): the photos, side by side with their numbers
+                const placed = dots.filter((p) => p.preview);
+                if (placed.length) await addKeyPages(doc, placed.map((p) => ({ key: p.key, photo: p })), `${pdfName}`);
 
                 const out = await doc.save();
                 const d = new Date();
@@ -2676,7 +2717,7 @@
                 a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 10000);
                 const skipped = photos.filter((p) => p.pos && !p.preview).length;
-                setSaveStatus(`Downloaded ${a.download} (${placed.length} photo${placed.length === 1 ? '' : 's'} as movable annotations${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
+                setSaveStatus(`Downloaded ${a.download} (${dots.length} numbered dot${dots.length === 1 ? '' : 's'} on the plan, ${placed.length} photo${placed.length === 1 ? '' : 's'} on the key page${skipped ? `; ${skipped} skipped, file missing` : ''}) to your Downloads folder`);
             } catch (err) {
                 setSaveStatus('Could not build the PDF: ' + err.message, false);
             } finally {

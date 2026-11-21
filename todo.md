@@ -50,6 +50,8 @@ Legend: [x] built and checked in headless Edge · [ ] not built · [?] built, ne
 - [ ] Warn when a linked file's size differs from the JSON (file edited since)
 
 ## Step 4: PDF with photos
+- [x] Richard's version (this branch): each placed photo is a numbered dot on the plan (movable Stamp annotation); a key page after the plan shows each dot beside its photo, in number order, with region, time and file name
+- [ ] Decide whether Richard's version goes to main (main has moved on since V1; V1 is tag `v1`)
 - [x] Download PDF with photos at their locations, plus region outlines/labels and a "Region | time" caption
 - [x] Each photo is a PDF Stamp annotation (its own movable object with the JPEG, frame and caption), not drawn into the page; the plan stays as-is underneath
 - [ ] Region outlines, labels and markup (notes, arrows, clouds) are still drawn into the page, so they are not selectable in Bluebeam
