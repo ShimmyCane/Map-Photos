@@ -23,11 +23,17 @@ On **Open JSON** the app asks you to choose the folder (or files). Each asset is
 | `plan.size_bytes`, `plan.modified` | Size and last-modified date of the plan file when imported. |
 | `plan.page`, `plan.page_width`, `plan.page_height` | Page used (only page 1 so far) and its size in points. |
 | `settings.photo_size_percent_of_page_width` | Size of every photo on the plan (1 to 20). All photos share one size. |
-| `regions[]` | Drawn regions. `type` is `box` (`x`, `y`, `width`, `height`) or `polyline` (`closed`, `points[{x,y}]`). `label` is the name you typed. |
+| `regions[]` | The active scheme's regions (kept for older readers; `schemes[]` is the full list). Drawn regions. `type` is `box` (`x`, `y`, `width`, `height`) or `polyline` (`closed`, `points[{x,y}]`). `label` is the name you typed. |
+| `schemes[]` | Layers: `id`, `name`, `regions[]`. The first entry is the base layer (Areas), which decides photo names and locations. Each later layer's name is also a tag. (same shape as `regions[]`). Each scheme is its own set of regions on the plan. Older files without it load as one scheme named Areas. |
+| `active_scheme` | `id` of the scheme shown on the plan and used for photo locations. |
+| `tags[]` | Tags: `id`, `name`, `color` (`#rrggbb`), `tab` (true = shown as a tab above the plan). |
 | `annotations[]` | Markup. `type` is `note` (`x`, `y`, `text`), `arrow` (`x1`, `y1` tail, `x2`, `y2` point) or `cloud` (`x`, `y`, `width`, `height`). Optional; older files without it open fine. |
+| `visibility` | Base-layer plan visibility: `mode` (`or` or `and`), `untagged` (show untagged photos), `hidden_tags[]` (tag ids switched off). |
+| `geo` | Plan placement on the map, or null: `lat`, `lng` (centre of the plan), `ratio` (drawing scale 1:N), `rot` (degrees clockwise from north for the top of the plan), `opacity`, `show`, `confirmed`, `method` (`centre` or `refs`), `refs[]` (reference pairs: `plan` {x, y} and `map` {lat, lng}; when there are two or more, the other fields are fitted from them). Lat/lng is in degrees (WGS84). |
 | `embedded` | Optional. Makes the file self-contained: `plan` is a data URI for the plan (PDF, JPG or PNG; an image becomes a one-page PDF) and `photos[]` has one data URI per entry in `photos[]`, same order. Files with `embedded` open directly, with no link step. The app never writes this field itself. |
 | `import_batches[]` | Each time photos were loaded: `batch` number, `imported_at`, `source` (`files` or `folder`), `photo_count`. |
 | `photos[].id` | Stable number for the photo within this project. |
+| `photos[].tags` | Tag `id`s on the photo. Its first tag's colour frames it on the plan and in the PDF. |
 | `photos[].file_name`, `path` | Original file. HEIC photos keep their `.HEIC` name; they are converted in the page when loaded. |
 | `photos[].size_bytes`, `modified` | Size and last-modified date of the original file. |
 | `photos[].format` | `jpeg`, `png`, `heic`, etc. |

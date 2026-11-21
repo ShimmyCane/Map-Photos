@@ -9,6 +9,8 @@
     <script src="libs/pdf-lib.min.js"></script>
     <script src="libs/heic2any.min.js"></script>
     <script src="libs/jszip.min.js"></script>
+    <link rel="stylesheet" href="libs/leaflet.css">
+    <script src="libs/leaflet.js"></script>
     <script src="sample-project/hollywood_bowl.sample.js"></script>  <!-- optional: lets the start screen offer the sample project -->
     <style>
         /* Map Photos: app-specific layout on top of the Archive / Draft system */
@@ -325,6 +327,70 @@
         }
         #toast.show { opacity: 1; }
 
+        /* Pointer mode, tabs, tags, schemes */
+        .tool-active.select-mode .photo-marker { pointer-events: auto; cursor: grab; }
+        .photo-marker.selected { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink-black); z-index: 45; }
+        #tab-bar { display: flex; gap: 4px; align-items: flex-end; padding: 6px 10px 0; background: var(--panel); border-bottom: 1px solid var(--border-dark); overflow-x: auto; flex: none; }
+        body:not(.has-pdf) #tab-list, body:not(.has-pdf) .tab-add { display: none; }
+        body.map-mode #tab-list, body.map-mode .tab-add { display: none; }
+        body.map-mode .sidebar { display: none; }
+        [hidden] { display: none !important; }
+        .view-switch { display: flex; flex: none; align-self: flex-end; margin-right: 12px; padding-bottom: 6px; }
+        .view-btn { font-family: var(--font-technical); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 14px; border: 1px solid var(--ink); background: var(--sheet); color: var(--ink); cursor: pointer; }
+        .view-btn + .view-btn { border-left: 0; }
+        .view-btn.active { background: var(--ink-black); color: var(--sheet); }
+        #map-view { flex: 1; min-height: 0; display: flex; }
+        #map { flex: 1; min-width: 0; background: var(--board); }
+        .map-side { width: 310px; flex: none; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--border-dark); padding: 0 var(--space-3) var(--space-3); }
+        .map-side .section { padding-top: var(--space-3); }
+        .map-side .input { width: 100%; box-sizing: border-box; }
+        .geo-field { display: block; font-size: 12px; margin-bottom: 8px; }
+        .geo-field .input, .geo-field .select { margin-top: 3px; }
+        .geo-field input[type="range"] { width: 100%; }
+        .geo-readout { font-size: 12px; line-height: 1.45; padding: 6px 8px; margin: 6px 0; border: 1px dashed var(--border-dark); background: var(--sheet); }
+        .geo-status { font-family: var(--font-technical); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .geo-status.ok { color: var(--blue); }
+        .geo-status.warn { color: var(--red); }
+        .plan-overlay-canvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+        .geo-photo { background: var(--sheet); border: 1px solid var(--ink); box-shadow: var(--shadow-paper); padding: 2px; }
+        .geo-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .geo-photo.approved { border: 2px solid var(--blue); }
+        .geo-row { display: flex; gap: 8px; align-items: center; padding: 4px 6px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--sheet); font-size: 12px; cursor: pointer; }
+        .geo-row.outside { opacity: 0.6; }
+        .geo-row img { width: 42px; height: 32px; object-fit: cover; display: block; border: 1px solid var(--ink); flex: none; }
+        .geo-row .label { font-size: 10px; }
+        .geo-plan-pick { width: 100%; display: block; margin: 6px 0; border: 1px solid var(--ink); cursor: crosshair; background: var(--sheet); }
+        .geo-ref-row { display: flex; gap: 6px; align-items: center; padding: 4px 6px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--sheet); font-size: 11px; }
+        .geo-ref-row .geo-ref-text { flex: 1; min-width: 0; line-height: 1.35; }
+        .geo-ref-pt { width: 22px !important; height: 22px !important; border-radius: 50%; background: var(--ochre); color: var(--sheet); border: 1px solid var(--ink-black); font-family: var(--font-technical); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-paper); }
+        .geo-fit { font-size: 12px; line-height: 1.45; padding: 6px 8px; margin: 6px 0; border: 1px dashed var(--border-dark); background: var(--sheet); }
+        .geo-fit.warn { color: var(--red); }
+        .plan-tab { font-family: var(--font-technical); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; padding: 6px 10px; border: 1px solid var(--border-dark); border-bottom: 0; border-top: 4px solid var(--tab, var(--ink)); background: var(--sheet); color: var(--ink); cursor: pointer; }
+        .plan-tab.active { background: var(--panel-hover); box-shadow: inset 0 -3px 0 var(--tab, var(--ink)); font-weight: 600; }
+        .plan-tab.drop { outline: 2px dashed var(--ink); outline-offset: -4px; }
+        .tab-add { display: flex; gap: 4px; align-items: center; margin-left: auto; padding-bottom: 6px; flex: none; }
+        .tab-add .select { width: 150px; }
+        .tab-add .input { width: 170px; }
+        #tab-bar { align-items: flex-end; }
+        .plan-tab .tab-count { color: var(--graphite); margin-left: 4px; }
+        .tag-dot { display: inline-block; width: 10px; height: 10px; border: 1px solid var(--ink); flex: none; }
+        .tag-add { display: flex; gap: 6px; margin-bottom: 6px; }
+        .tag-add .input { flex: 1; min-width: 0; }
+        .tag-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; margin-bottom: 4px; border: 1px solid var(--border); background: var(--sheet); font-size: 12px; }
+        .tag-row input[type="color"] { width: 24px; height: 22px; padding: 0; border: 1px solid var(--ink); background: none; cursor: pointer; flex: none; }
+        .tag-row .tag-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tag-row .check { margin: 0; font-size: 11px; }
+        .scheme-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+        .scheme-row .select { flex: 1 1 100%; }
+        .inspector { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+        .inspector-thumb { width: 78px; flex: none; border: 1px solid var(--ink); background: var(--sheet); padding: 2px; }
+        .inspector-thumb img, .inspector-thumb .photo-fallback { width: 100%; display: block; }
+        .inspector-meta { font-size: 12px; line-height: 1.4; min-width: 0; }
+        .tag-checks .check { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-bottom: 4px; }
+        .move-row { display: flex; gap: 6px; margin-top: 8px; }
+        .move-row .select { flex: 1; min-width: 0; }
+        .photo-tag.tag { display: flex; align-items: center; gap: 5px; border: 1px solid var(--tag, var(--ink)); background: var(--sheet); color: var(--ink); }
+        .photo-card.selected .photo-thumbnail { outline: 2px solid var(--ink-black); outline-offset: 1px; }
         .sidebar-content::-webkit-scrollbar, .pdf-canvas-wrapper::-webkit-scrollbar { width: 10px; height: 10px; }
         .sidebar-content::-webkit-scrollbar-thumb, .pdf-canvas-wrapper::-webkit-scrollbar-thumb { background: var(--construction); border: 2px solid transparent; background-clip: content-box; }
 
@@ -364,6 +430,7 @@
         <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
         <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="11" x2="11" y1="8" y2="14" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
         <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /> <line x1="21" x2="16.65" y1="21" y2="16.65" /> <line x1="8" x2="14" y1="11" y2="11" /></symbol>
+        <symbol id="i-mouse-pointer-2" viewBox="0 0 24 24"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z" /></symbol>
         <symbol id="i-type" viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7" /> <line x1="9" x2="15" y1="20" y2="20" /> <line x1="12" x2="12" y1="4" y2="20" /></symbol>
         <symbol id="i-arrow-up-right" viewBox="0 0 24 24"><path d="M7 7h10v10" /> <path d="M7 17 17 7" /></symbol>
         <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></symbol>
@@ -411,6 +478,7 @@
                 <button class="tool-btn" id="polyline-btn" title="Polyline region: click points, double-click to close"><svg class="icon"><use href="#i-pen-tool"/></svg></button>
                 <button class="tool-btn" id="box-btn" title="Box region: drag a rectangle"><svg class="icon"><use href="#i-square"/></svg></button>
                 <div class="rule"></div>
+                <button class="tool-btn" id="select-btn" title="Pointer: click a photo on the plan or in the list to select it, then drag it or tag it"><svg class="icon"><use href="#i-mouse-pointer-2"/></svg></button>
                 <button class="tool-btn" id="note-btn" title="Text note: click on the plan, then type"><svg class="icon"><use href="#i-type"/></svg></button>
                 <button class="tool-btn" id="arrow-btn" title="Arrow: drag from the tail to the point"><svg class="icon"><use href="#i-arrow-up-right"/></svg></button>
                 <button class="tool-btn" id="cloud-btn" title="Revision cloud: drag a rectangle around the change"><svg class="icon"><use href="#i-cloud"/></svg></button>
@@ -419,6 +487,18 @@
             </nav>
 
             <main class="pdf-panel">
+                <div id="tab-bar">
+                    <span class="view-switch">
+                        <button class="view-btn active" id="view-plan">Plan</button>
+                        <button class="view-btn" id="view-map" title="Map: place the plan on OpenStreetMap and check geotagged photos">Map</button>
+                    </span>
+                    <span id="tab-list"></span>
+                    <span class="tab-add">
+                        <select id="tab-pick" class="select" title="Pick an existing tag for a new tab"></select>
+                        <input type="text" class="input" id="tab-name" placeholder="or type a new name" title="Typing a name creates the tag if it is new">
+                        <button class="btn btn-sm" id="tab-add-btn">+ Tab</button>
+                    </span>
+                </div>
                 <div class="pdf-canvas-wrapper" id="canvas-wrapper">
                     <div class="canvas-container" id="canvas-container">
                         <canvas id="pdf-canvas"></canvas>
@@ -439,10 +519,92 @@
                         </div>
                     </div>
                 </div>
+                <div id="map-view" hidden>
+                    <div id="map"></div>
+                    <aside class="map-side">
+                        <div class="section">
+                            <div class="section-title">Plan on map</div>
+                            <div id="geo-status" class="geo-status"></div>
+                            <label class="geo-field">Placement method
+                                <select id="geo-method" class="select">
+                                    <option value="centre">Centre point + scale + rotation</option>
+                                    <option value="refs">Reference points (two or more)</option>
+                                </select>
+                            </label>
+                            <label class="geo-field">Drawing scale 1 : <input type="number" class="input" id="geo-ratio" min="1" step="1" value="100"></label>
+                            <label class="geo-field">Rotation (degrees clockwise from north; 0 = top of plan points north)
+                                <input type="number" class="input" id="geo-rot" step="0.5" value="0">
+                                <input type="range" id="geo-rot-slider" min="-180" max="180" step="0.5" value="0">
+                            </label>
+                            <div class="scheme-row">
+                                <label class="geo-field" style="flex:1 1 45%">Centre lat <input type="number" class="input" id="geo-lat" step="0.000001"></label>
+                                <label class="geo-field" style="flex:1 1 45%">Centre lng <input type="number" class="input" id="geo-lng" step="0.000001"></label>
+                            </div>
+                            <div class="scheme-row">
+                                <button class="btn btn-sm" id="geo-goto">Go to plan</button>
+                                <button class="btn btn-sm" id="geo-use-view">Centre = map view</button>
+                                <button class="btn btn-sm" id="geo-pick">Click map to set centre</button>
+                            </div>
+                            <label class="geo-field">Opacity <input type="range" id="geo-opacity" min="0" max="1" step="0.05" value="0.6"></label>
+                            <label class="check"><input type="checkbox" id="geo-show" checked> Show plan on map</label>
+                            <div id="geo-refs-block" hidden>
+                                <div class="photo-help">Add point, click a distinctive spot on the plan above (a gate, a corner), then the same spot on the map. Two points fix scale and rotation exactly; more points average out small mistakes. Zoom the map in for accuracy.</div>
+                                <canvas id="geo-plan-pick" class="geo-plan-pick" title="Click a spot on the plan"></canvas>
+                                <div class="scheme-row">
+                                    <button class="btn btn-sm btn-primary" id="ref-add">Add point</button>
+                                    <button class="btn btn-sm" id="ref-cancel">Cancel</button>
+                                </div>
+                                <div id="geo-ref-list"></div>
+                                <div id="geo-fit" class="geo-fit"></div>
+                            </div>
+                            <div id="geo-readout" class="geo-readout"></div>
+                            <div class="scheme-row">
+                                <button class="btn btn-primary btn-sm" id="geo-confirm">Confirm placement</button>
+                                <button class="btn btn-danger btn-sm" id="geo-clear">Remove placement</button>
+                            </div>
+                            <div class="photo-help">Check the plan against map features: roads, buildings, the scale bar at the bottom left. The red frame is the plan; its top edge is marked. Confirm only when the orientation and size look right.</div>
+                        </div>
+                        <div class="section">
+                            <div class="section-title">Geotagged photos <span id="geo-count"></span></div>
+                            <div class="scheme-row">
+                                <button class="btn btn-sm" id="geo-scan">Scan for geotags</button>
+                                <button class="btn btn-sm" id="geo-approve-all">Approve all</button>
+                                <button class="btn btn-sm btn-primary" id="geo-import">Import approved</button>
+                            </div>
+                            <div class="photo-help">Faded photos on the map come from their GPS tags. Tick the ones that belong on this plan. Only ticked photos are imported onto the plan, and only after you confirm the placement.</div>
+                            <div id="geo-list"></div>
+                        </div>
+                    </aside>
+                </div>
             </main>
 
             <aside class="sidebar">
                 <div class="sidebar-content">
+                    <div class="section">
+                        <div class="section-title">Layers</div>
+                        <div class="scheme-row">
+                            <select id="scheme-select" class="select" title="Show this layer's regions on the plan"></select>
+                            <button class="btn btn-sm" id="scheme-new">New layer</button>
+                            <button class="btn btn-sm" id="scheme-rename">Rename</button>
+                            <button class="btn btn-sm btn-danger" id="scheme-delete">Delete</button>
+                        </div>
+                        <div class="photo-help">Areas is the base layer: its region names make the photo file names, and it cannot be renamed or deleted. A new layer's name becomes a tag. Regions you draw go into the layer shown here.</div>
+                    </div>
+                    <div class="section" id="vis-section">
+                        <div class="section-title">Visibility <span>(base layer)</span></div>
+                        <div class="scheme-row">
+                            <select id="vis-mode" class="select" title="OR: a photo shows if any of its ticked tags is ticked. AND: only if all of its tags are ticked.">
+                                <option value="or">Any ticked tag (OR)</option>
+                                <option value="and">All its tags ticked (AND)</option>
+                            </select>
+                        </div>
+                        <div id="vis-list"></div>
+                        <div class="scheme-row" style="margin-top:6px">
+                            <button class="btn btn-sm" id="vis-all">All on</button>
+                            <button class="btn btn-sm" id="vis-none">All off</button>
+                        </div>
+                        <div class="photo-help">Untick a tag to hide the photos that carry it. Only the plan changes; the photo list still shows everything.</div>
+                    </div>
                     <div class="section">
                         <div class="section-title">Regions</div>
                         <div id="regions-list"></div>
@@ -454,6 +616,19 @@
                     <div class="section">
                         <div class="section-title">Filter by region</div>
                         <div id="region-filters"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Tags <span id="tag-count"></span></div>
+                        <div class="tag-add">
+                            <input type="text" class="input" id="tag-name-input" placeholder="New tag, e.g. Electrical">
+                            <button class="btn btn-sm" id="tag-add-btn">Add</button>
+                        </div>
+                        <div class="photo-help">Tags go on photos. Tick Tab to show a tag as a tab above the plan. Tags do not have to be tabs.</div>
+                        <div id="tag-list"></div>
+                    </div>
+                    <div class="section">
+                        <div class="section-title">Selected photo</div>
+                        <div id="inspector"></div>
                     </div>
                     <div class="section">
                         <div class="section-title">Photos <span id="photo-count"></span></div>
@@ -508,7 +683,7 @@
                 </div>
                 <label class="check"><input type="checkbox" id="plain-downloads-toggle"> Always use plain browser downloads for Save and Download photos (skip the save/folder dialogs)</label>
             </div>
-            <p class="modal-note">All data stays on this device. No network access.</p>
+            <p class="modal-note">Your plan and photos stay on this device. The Map view loads OpenStreetMap tiles for the area you look at; nothing else is sent.</p>
             <div class="modal-buttons">
                 <button class="btn" onclick="closeSettings()">Close</button>
             </div>
@@ -574,7 +749,24 @@
         let zoomLevel = 1;
         let pageW = 0, pageH = 0;
         let renderTask = null;
-        let regions = [];
+        // Schemes are named sets of regions on the same plan. `regions` always points at the active scheme's array.
+        let schemes = [{ id: 1, name: 'Areas', regions: [] }];
+        let activeSchemeId = 1;
+        let nextSchemeId = 2;
+        let regions = schemes[0].regions;
+        let tags = [];            // { id, name, color, tab }
+        let nextTagId = 1;
+        let activeTab = null;     // tag id of the tab being viewed; null = all photos
+        let selectedPhotoId = null;
+        let geo = null;               // map placement of the plan: { lat, lng, ratio, rot, opacity, show, confirmed }
+        let geoMap = null, geoCanvas = null, geoPhotoLayer = null, overlayImg = null, overlayBusy = false, geoPicking = false;
+        const geoApproved = new Set();   // photo ids ticked for import
+        let refPick = { step: null, planPt: null };   // reference point being added: step 'plan' or 'map'
+        let geoRefLayer = null;
+        let refFitError = null;
+        let visMode = 'or';           // plan visibility on the base layer: 'or' or 'and'
+        let hiddenTags = new Set();   // tag ids switched off (new tags are on by default)
+        let showUntagged = true;
         let annotations = [];     // markup: notes, arrows, clouds (plan units, like regions)
         let nextAnnotId = 1;
         let currentAnn = null;    // markup being dragged out
@@ -630,6 +822,7 @@
             const doc = await pdfjsLib.getDocument({ data: bytes.slice(0) }).promise;
             pdfBytes = bytes;
             pdfDoc = doc;
+            overlayImg = null;
             pdfName = name;
             currentPage = 1;
             const vp = (await pdfDoc.getPage(currentPage)).getViewport({ scale: 1 });
@@ -905,15 +1098,16 @@
             currentRegion = null;
             currentAnn = null;
             isDrawing = false;
-            annotationCanvas.style.cursor = currentTool === 'pan' ? 'grab' : currentTool ? 'crosshair' : 'default';
+            annotationCanvas.style.cursor = currentTool === 'pan' ? 'grab' : currentTool && currentTool !== 'select' ? 'crosshair' : 'default';
             container.classList.toggle('tool-active', !!currentTool);
-            ['pan', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').classList.toggle('active', currentTool === t));
+            container.classList.toggle('select-mode', currentTool === 'select');
+            ['pan', 'select', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').classList.toggle('active', currentTool === t));
             redrawAnnotations();
         }
-        ['pan', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').addEventListener('click', () => setTool(t)));
+        ['pan', 'select', 'polyline', 'box', 'note', 'arrow', 'cloud'].forEach((t) => document.getElementById(t + '-btn').addEventListener('click', () => setTool(t)));
 
         document.getElementById('clear-regions-btn').addEventListener('click', () => {
-            regions = [];
+            regions.length = 0;
             selectedRegionFilters.clear();
             updateRegionsList();
             redrawAnnotations();
@@ -932,6 +1126,8 @@
             } else if (currentTool === 'box') {
                 currentRegion = { type: 'box', x: p.x, y: p.y, width: 0, height: 0 };
                 isDrawing = true;
+            } else if (currentTool === 'select') {
+                selectPhoto(null);
             } else if (currentTool === 'note') {
                 openNoteModal(null, p);
             } else if (currentTool === 'arrow') {
@@ -1005,6 +1201,802 @@
             }
         });
 
+        // ---------- Schemes, tags, tabs, pointer selection ----------
+        const TAG_COLORS = ['#B76556', '#607D91', '#B08C55', '#6E8B5E', '#7B6A9E', '#5E8C8A', '#A0607A', '#8A7A4E'];
+        const activeScheme = () => schemes.find((s) => s.id === activeSchemeId) || schemes[0];
+        const tagById = (id) => tags.find((t) => t.id === id);
+        const tagsFor = (p) => tags.filter((t) => (p.tags || []).includes(t.id));   // in tag-list order
+        const tabOK = (p) => activeTab === null || (p.tags || []).includes(activeTab);
+
+        // Frame colour for the PDF export: the first tag's colour, else the default ink.
+        function tagRgbArr(p, fallback) {
+            const t = tagsFor(p)[0];
+            if (!t) return fallback;
+            const n = parseInt(t.color.slice(1), 16);
+            return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        }
+
+        // Switching scheme swaps which set of regions is drawn and used for photo locations.
+        function setActiveScheme(id) {
+            const s = schemes.find((x) => x.id === id) || schemes[0];
+            activeSchemeId = s.id;
+            regions = s.regions;
+            currentRegion = null;
+            selectedRegionFilters.clear();
+            updateRegionsList();
+            redrawAnnotations();
+            scheduleAutosave();
+        }
+
+        function renderSchemes() {
+            const sel = document.getElementById('scheme-select');
+            if (!sel) return;
+            sel.innerHTML = schemes.map((s, i) => `<option value="${s.id}" ${s.id === activeSchemeId ? 'selected' : ''}>${escapeHtml(s.name)}${i === 0 ? ' (base)' : ''} (${s.regions.length})</option>`).join('');
+            const onBase = activeSchemeId === schemes[0].id;
+            document.getElementById('scheme-delete').disabled = onBase;
+            document.getElementById('scheme-rename').disabled = onBase;
+        }
+
+        function addTagToPhoto(p, id) {
+            p.tags = p.tags || [];
+            if (!p.tags.includes(id)) p.tags.push(id);
+        }
+        function removeTagFromPhoto(p, id) {
+            p.tags = (p.tags || []).filter((x) => x !== id);
+        }
+
+        const tagNamed = (name) => tags.find((t) => t.name.toLowerCase() === String(name).trim().toLowerCase());
+        // Returns the tag with this name, creating it (not a tab) if needed.
+        function ensureTag(name) {
+            const n = String(name || '').trim();
+            if (!n) return null;
+            const found = tagNamed(n);
+            if (found) return found;
+            const t = { id: nextTagId++, name: n, color: TAG_COLORS[tags.length % TAG_COLORS.length], tab: false };
+            tags.push(t);
+            return t;
+        }
+        function addTag(name) {
+            const n = String(name || '').trim();
+            if (!n) return false;
+            if (tagNamed(n)) { showToast(`"${n}" already exists`); return false; }
+            ensureTag(n);
+            updatePhotoGrid();
+            return true;
+        }
+        // Renaming a tag also renames a layer that was named after it, and vice versa.
+        function renameTag(id) {
+            const t = tagById(id);
+            if (!t) return;
+            const name = prompt('Rename the tag (this is also its tab, and any layer of the same name):', t.name);
+            if (!name || !name.trim() || name.trim() === t.name) return;
+            const n = name.trim();
+            if (tagNamed(n) && tagNamed(n) !== t) { showToast(`"${n}" already exists`); return; }
+            const old = t.name;
+            t.name = n;
+            schemes.slice(1).forEach((s) => { if (s.name === old) s.name = n; });
+            updatePhotoGrid();
+            scheduleAutosave();
+        }
+        // Base layer only: a photo shows if any (OR) or all (AND) of its tags are on. Untagged photos follow their own tick.
+        function visOK(p) {
+            if (activeSchemeId !== schemes[0].id) return true;
+            const ids = p.tags || [];
+            if (!ids.length) return showUntagged;
+            const on = (id) => !hiddenTags.has(id);
+            return visMode === 'and' ? ids.every(on) : ids.some(on);
+        }
+        function setVisTag(id, on) {
+            if (on) hiddenTags.delete(id); else hiddenTags.add(id);
+            updatePhotoGrid();
+        }
+        function setAllVis(on) {
+            hiddenTags = on ? new Set() : new Set(tags.map((t) => t.id));
+            updatePhotoGrid();
+        }
+        function renderVisibility() {
+            const onBase = activeSchemeId === schemes[0].id;
+            document.getElementById('vis-section').style.display = onBase ? '' : 'none';
+            document.getElementById('vis-mode').value = visMode;
+            document.getElementById('vis-list').innerHTML = tags.map((t) => `
+                <label class="check tag-checks-row"><input type="checkbox" ${hiddenTags.has(t.id) ? '' : 'checked'} onchange="setVisTag(${t.id}, this.checked)">
+                <span class="tag-dot" style="background:${t.color}"></span>${escapeHtml(t.name)}</label>`).join('')
+                + `<label class="check tag-checks-row"><input type="checkbox" ${showUntagged ? 'checked' : ''} onchange="showUntagged = this.checked; updatePhotoGrid()"> <i class="tag-dot" style="background:transparent"></i>Untagged photos</label>`;
+        }
+        document.getElementById('vis-mode').addEventListener('change', (e) => { visMode = e.target.value; updatePhotoGrid(); scheduleAutosave(); });
+        document.getElementById('vis-all').addEventListener('click', () => setAllVis(true));
+        document.getElementById('vis-none').addEventListener('click', () => setAllVis(false));
+
+        function setTagColor(id, hex) {
+            const t = tagById(id);
+            if (t) { t.color = hex; updatePhotoGrid(); }
+        }
+        function setTagTab(id, on) {
+            const t = tagById(id);
+            if (!t) return;
+            t.tab = !!on;
+            if (!on && activeTab === id) activeTab = null;
+            updatePhotoGrid();
+        }
+        function deleteTag(id) {
+            const t = tagById(id);
+            if (!t) return;
+            const n = photos.filter((p) => (p.tags || []).includes(id)).length;
+            if (!confirm(`Delete the tag "${t.name}"?${n ? ` It is taken off ${n} photo(s).` : ''}`)) return;
+            tags = tags.filter((x) => x.id !== id);
+            hiddenTags.delete(id);
+            photos.forEach((p) => removeTagFromPhoto(p, id));
+            if (activeTab === id) activeTab = null;
+            updatePhotoGrid();
+        }
+        function togglePhotoTag(pid, tid, on) {
+            const p = photos.find((x) => x.id === pid);
+            if (!p) return;
+            if (on) addTagToPhoto(p, tid); else removeTagFromPhoto(p, tid);
+            updatePhotoGrid();
+        }
+        // Move = take the photo off the tab being viewed and put it on the chosen tag. On All photos it just adds.
+        function movePhoto(pid) {
+            const p = photos.find((x) => x.id === pid);
+            const target = +document.getElementById('move-select').value;
+            if (!p || !tagById(target)) return;
+            if (activeTab !== null && activeTab !== target) removeTagFromPhoto(p, activeTab);
+            addTagToPhoto(p, target);
+            updatePhotoGrid();
+        }
+
+        function renderTags() {
+            document.getElementById('tag-count').textContent = tags.length ? `(${tags.length})` : '';
+            document.getElementById('tag-list').innerHTML = tags.map((t) => {
+                const n = photos.filter((p) => (p.tags || []).includes(t.id)).length;
+                return `
+                <div class="tag-row">
+                    <input type="color" value="${t.color}" title="Tag colour" onchange="setTagColor(${t.id}, this.value)">
+                    <span class="tag-name" title="${escapeHtml(t.name)}">${escapeHtml(t.name)}</span>
+                    <span class="label">${n}</span>
+                    <label class="check"><input type="checkbox" ${t.tab ? 'checked' : ''} onchange="setTagTab(${t.id}, this.checked)"> Tab</label>
+                    <button class="btn btn-sm" onclick="renameTag(${t.id})">Rename</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteTag(${t.id})">Delete</button>
+                </div>`;
+            }).join('') || '<p class="empty-note">No tags yet. Add one above.</p>';
+        }
+
+        function renderTabs() {
+            const bar = document.getElementById('tab-list');
+            const pick = document.getElementById('tab-pick');
+            pick.innerHTML = '<option value="">Pick a tag…</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}${t.tab ? ' (tab)' : ''}</option>`).join('');
+            const countOf = (id) => photos.filter((p) => (p.tags || []).includes(id)).length;
+            const tab = (id, label, color, n) => `<button class="plan-tab ${activeTab === id ? 'active' : ''}" style="--tab:${color}" data-tab="${id === null ? '' : id}">${escapeHtml(label)}<span class="tab-count">${n}</span></button>`;
+            bar.innerHTML = tab(null, 'All photos', '#383833', photos.length)
+                + tags.filter((t) => t.tab).map((t) => tab(t.id, t.name, t.color, countOf(t.id))).join('');
+        }
+
+        function renderInspector() {
+            const el = document.getElementById('inspector');
+            const p = photos.find((x) => x.id === selectedPhotoId);
+            if (!p) {
+                el.innerHTML = '<p class="empty-note">Use the pointer tool and click a photo on the plan (or in the list). Then tick its tags here, or drag its card onto a tab.</p>';
+                return;
+            }
+            const r = regionOf(p);
+            const where = !p.pos ? 'not placed' : r ? `in ${r.label}` : 'on plan, no region';
+            const body = p.thumb ? `<img src="${p.thumb}" alt="">` : `<div class="photo-fallback">${escapeHtml(p.name)}</div>`;
+            const cur = activeTab !== null ? tagById(activeTab) : null;
+            const targets = tags.filter((t) => t.id !== activeTab);
+            el.innerHTML = `
+                <div class="inspector">
+                    <div class="inspector-thumb">${body}</div>
+                    <div class="inspector-meta"><b>${escapeHtml(p.name)}</b><br>
+                        <span class="label">${new Date(p.timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span><br>
+                        <span class="label">${escapeHtml(where)}</span></div>
+                </div>
+                <div class="tag-checks">
+                    ${tags.map((t) => `<label class="check"><input type="checkbox" ${(p.tags || []).includes(t.id) ? 'checked' : ''} onchange="togglePhotoTag(${p.id}, ${t.id}, this.checked)"><span class="tag-dot" style="background:${t.color}"></span>${escapeHtml(t.name)}</label>`).join('') || '<p class="empty-note">No tags yet.</p>'}
+                </div>
+                ${targets.length ? `<div class="move-row">
+                    <select id="move-select" class="select" title="Choose the tag to move or add this photo to">
+                        ${targets.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}
+                    </select>
+                    <button class="btn btn-sm" onclick="movePhoto(${p.id})">${cur ? 'Move' : 'Add'}</button>
+                </div>
+                <div class="photo-help" style="margin-top:4px">${cur ? `Move takes it off “${escapeHtml(cur.name)}” and onto the tag you pick.` : 'Add puts the photo on the tag you pick.'}</div>` : ''}
+            `;
+        }
+
+        // Pointer mode: select a photo. Toggles classes instead of re-rendering so an in-progress drag keeps its element.
+        function selectPhoto(id) {
+            selectedPhotoId = id;
+            markerLayer.querySelectorAll('.photo-marker').forEach((m) => m.classList.toggle('selected', +m.dataset.id === id));
+            document.querySelectorAll('.photo-card').forEach((c) => c.classList.toggle('selected', +c.dataset.id === id));
+            renderInspector();
+        }
+
+        // Wiring
+        document.getElementById('scheme-select').addEventListener('change', (e) => setActiveScheme(+e.target.value));
+        document.getElementById('scheme-new').addEventListener('click', () => {
+            const name = prompt('Name the new layer. Its name becomes a tag, e.g. Trades:', 'Trades');
+            if (!name || !name.trim()) return;
+            const n = name.trim();
+            if (schemes.some((x) => x.name.toLowerCase() === n.toLowerCase())) { showToast(`A layer called "${n}" already exists`); return; }
+            const s = { id: nextSchemeId++, name: n, regions: [] };
+            schemes.push(s);
+            ensureTag(n);
+            setActiveScheme(s.id);
+        });
+        document.getElementById('scheme-rename').addEventListener('click', () => {
+            const s = activeScheme();
+            if (s === schemes[0]) return;
+            const name = prompt('Rename the layer (its tag is renamed too):', s.name);
+            if (!name || !name.trim()) return;
+            const n = name.trim();
+            const old = s.name;
+            const clash = tagNamed(n);
+            if (clash && clash.name !== old) { showToast(`"${n}" is already a tag`); return; }
+            s.name = n;
+            const t = tagNamed(old);
+            if (t) t.name = n; else ensureTag(n);
+            updatePhotoGrid();
+            scheduleAutosave();
+        });
+        document.getElementById('scheme-delete').addEventListener('click', () => {
+            const s = activeScheme();
+            if (s === schemes[0]) return;
+            if (!confirm(`Delete the layer "${s.name}" and its ${s.regions.length} region(s)? Photos and tags are kept.`)) return;
+            schemes = schemes.filter((x) => x.id !== s.id);
+            setActiveScheme(schemes[0].id);
+        });
+        const addTagFromInput = () => {
+            const i = document.getElementById('tag-name-input');
+            if (addTag(i.value)) i.value = '';
+        };
+        document.getElementById('tag-add-btn').addEventListener('click', addTagFromInput);
+        document.getElementById('tag-name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTagFromInput(); });
+        // Switch tabs without re-rendering the tab bar, so a double-click (rename) still lands on the same element.
+        document.getElementById('tab-bar').addEventListener('click', (e) => {
+            const b = e.target.closest('.plan-tab');
+            if (!b) return;
+            activeTab = b.dataset.tab === '' ? null : +b.dataset.tab;
+            document.querySelectorAll('.plan-tab').forEach((t) => t.classList.toggle('active', t === b));
+            renderMarkers();
+            renderInspector();
+        });
+        document.getElementById('tab-bar').addEventListener('dblclick', (e) => {
+            const b = e.target.closest('.plan-tab');
+            if (b && b.dataset.tab !== '') renameTag(+b.dataset.tab);
+        });
+        // A new tab: pick an existing tag, or type a name (creates the tag if it is new).
+        const addTabFromForm = () => {
+            const typed = document.getElementById('tab-name').value.trim();
+            const pickId = document.getElementById('tab-pick').value;
+            const tag = typed ? ensureTag(typed) : tagById(+pickId);
+            if (!tag) { showToast('Pick a tag or type a name for the new tab'); return; }
+            if (tag.tab) { showToast(`"${tag.name}" is already a tab`); return; }
+            tag.tab = true;
+            document.getElementById('tab-name').value = '';
+            updatePhotoGrid();
+            scheduleAutosave();
+        };
+        document.getElementById('tab-add-btn').addEventListener('click', addTabFromForm);
+        document.getElementById('tab-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTabFromForm(); });
+        // Drop a photo card on a tab to tag it. Dropped on a different tab than the one viewed: moves it.
+        const tabBar = document.getElementById('tab-list');
+        tabBar.addEventListener('dragover', (e) => {
+            const b = e.target.closest('.plan-tab');
+            if (!b || b.dataset.tab === '' || draggedPhotoId === null) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';   // matches the card's effectAllowed = 'copy'
+            b.classList.add('drop');
+        });
+        tabBar.addEventListener('dragleave', (e) => {
+            const b = e.target.closest('.plan-tab');
+            if (b) b.classList.remove('drop');
+        });
+        tabBar.addEventListener('drop', (e) => {
+            const b = e.target.closest('.plan-tab');
+            if (!b) return;
+            b.classList.remove('drop');
+            if (draggedPhotoId === null || b.dataset.tab === '') return;
+            e.preventDefault();
+            const target = +b.dataset.tab;
+            const p = photos.find((x) => x.id === draggedPhotoId);
+            draggedPhotoId = null;
+            if (!p) return;
+            if (activeTab !== null && activeTab !== target) removeTagFromPhoto(p, activeTab);
+            addTagToPhoto(p, target);
+            showToast(`Tagged “${tagById(target).name}”`);
+            updatePhotoGrid();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && selectedPhotoId !== null && !document.querySelector('.modal.active')) selectPhoto(null);
+        });
+
+        // ---------- Map view: the plan placed on OpenStreetMap, geotagged photos ----------
+        // Placement = centre point + drawing scale + rotation. Plan "up" (top edge) points at `rot` degrees clockwise from north.
+        const M_PER_PAPER_PT = 0.0254 / 72;        // one PDF point on paper, in metres
+        const mPerDegLat = 111320;
+        const mPerDegLng = () => 111320 * Math.cos(geo.lat * Math.PI / 180);
+        const metresPerPt = () => geo.ratio * M_PER_PAPER_PT;   // real metres per plan unit at this scale
+
+        function planToLatLng(x, y) {
+            const k = metresPerPt();
+            const dx = (x - pageW / 2) * k, dy = (y - pageH / 2) * k;
+            const b = geo.rot * Math.PI / 180;
+            const E = dx * Math.cos(b) - dy * Math.sin(b);
+            const N = -dx * Math.sin(b) - dy * Math.cos(b);
+            return { lat: geo.lat + N / mPerDegLat, lng: geo.lng + E / mPerDegLng() };
+        }
+        function latLngToPlan(lat, lng) {
+            const k = metresPerPt();
+            const E = (lng - geo.lng) * mPerDegLng(), N = (lat - geo.lat) * mPerDegLat;
+            const b = geo.rot * Math.PI / 180;
+            const dx = E * Math.cos(b) - N * Math.sin(b);
+            const dy = -E * Math.sin(b) - N * Math.cos(b);
+            return { x: pageW / 2 + dx / k, y: pageH / 2 + dy / k };
+        }
+        const insidePlan = (pt) => pt.x >= 0 && pt.x <= pageW && pt.y >= 0 && pt.y <= pageH;
+
+        // The page drawn once at a sensible size, used as the overlay image.
+        async function ensureOverlayImage() {
+            if (overlayImg || !pdfDoc || overlayBusy) return overlayImg;
+            overlayBusy = true;
+            try {
+                const page = await pdfDoc.getPage(currentPage);
+                const vp = page.getViewport({ scale: Math.min(3, 2400 / pageW) });
+                const c = document.createElement('canvas');
+                c.width = Math.round(vp.width);
+                c.height = Math.round(vp.height);
+                await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                overlayImg = c;
+            } finally {
+                overlayBusy = false;
+            }
+            return overlayImg;
+        }
+
+        function ensureGeo() {
+            if (geo) return;
+            const c = geoMap ? geoMap.getCenter() : { lat: 0, lng: 0 };
+            geo = { lat: c.lat, lng: c.lng, ratio: 100, rot: 0, opacity: 0.6, show: true, confirmed: false };
+        }
+        function setGeo(patch, resetConfirm = true) {
+            ensureGeo();
+            Object.assign(geo, patch);
+            if (resetConfirm && ['lat', 'lng', 'ratio', 'rot'].some((k) => k in patch)) geo.confirmed = false;
+            syncGeoInputs();
+            drawOverlay();
+            renderGeoList();
+            scheduleAutosave();
+        }
+
+        // Draws the plan image with an affine transform from three corners, so rotation and scale come out right.
+        function drawOverlay() {
+            if (!geoMap) return;
+            const size = geoMap.getSize();
+            geoCanvas.width = size.x;
+            geoCanvas.height = size.y;
+            L.DomUtil.setPosition(geoCanvas, geoMap.containerPointToLayerPoint([0, 0]));
+            const ctx = geoCanvas.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, size.x, size.y);
+            updateGeoReadout();
+            if (!geo || !geo.show || !pdfDoc) return;
+            if (!overlayImg) { ensureOverlayImage().then(drawOverlay); return; }
+            const P = (x, y) => geoMap.latLngToContainerPoint(planToLatLng(x, y));
+            const p0 = P(0, 0), p1 = P(pageW, 0), p2 = P(0, pageH), p3 = P(pageW, pageH);
+            const W = overlayImg.width, H = overlayImg.height;
+            ctx.imageSmoothingEnabled = true;
+            ctx.globalAlpha = geo.opacity;
+            ctx.setTransform((p1.x - p0.x) / W, (p1.y - p0.y) / W, (p2.x - p0.x) / H, (p2.y - p0.y) / H, p0.x, p0.y);
+            ctx.drawImage(overlayImg, 0, 0);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#B76556';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(p2.x, p2.y);
+            ctx.closePath();
+            ctx.stroke();
+            // mark the top edge so orientation is obvious
+            ctx.fillStyle = '#B76556';
+            ctx.font = '600 12px "IBM Plex Mono", monospace';
+            ctx.fillText('TOP OF PLAN', (p0.x + p1.x) / 2 + 6, (p0.y + p1.y) / 2 - 8);
+        }
+
+        function syncGeoInputs() {
+            const v = (id, val) => { const el = document.getElementById(id); if (document.activeElement !== el) el.value = val; };
+            const refsMode = !!geo && geo.method === 'refs';
+            ['geo-ratio', 'geo-rot', 'geo-rot-slider', 'geo-lat', 'geo-lng', 'geo-use-view', 'geo-pick'].forEach((id) => { document.getElementById(id).disabled = refsMode; });
+            document.getElementById('geo-method').value = geo ? geo.method : 'centre';
+            document.getElementById('geo-refs-block').hidden = !refsMode;
+            const g = geo || { lat: '', lng: '', ratio: 100, rot: 0, opacity: 0.6, show: true };
+            v('geo-ratio', g.ratio);
+            v('geo-rot', g.rot);
+            v('geo-rot-slider', Math.max(-180, Math.min(180, g.rot)));
+            v('geo-lat', geo ? geo.lat.toFixed(6) : '');
+            v('geo-lng', geo ? geo.lng.toFixed(6) : '');
+            v('geo-opacity', g.opacity);
+            document.getElementById('geo-show').checked = g.show;
+            updateGeoReadout();
+        }
+
+        function updateGeoReadout() {
+            const status = document.getElementById('geo-status');
+            const box = document.getElementById('geo-readout');
+            const btnPick = document.getElementById('geo-pick');
+            btnPick.classList.toggle('active', geoPicking);
+            if (geo && geo.method === 'refs' && pdfDoc) { renderRefs(); }
+            if (!pdfDoc) {
+                status.textContent = 'Load a plan in Plan view first';
+                status.className = 'geo-status warn';
+                box.textContent = 'The plan is needed to place it on the map.';
+                return;
+            }
+            if (!geo) {
+                status.textContent = 'Not placed';
+                status.className = 'geo-status warn';
+                box.textContent = 'Set the centre (click the map, or use the map view), then the scale and rotation.';
+                return;
+            }
+            const k = metresPerPt();
+            box.textContent = `Plan is ${(pageW * k).toFixed(1)} m wide and ${(pageH * k).toFixed(1)} m high at 1:${geo.ratio}. Top of plan points ${((geo.rot % 360) + 360) % 360}° clockwise from north.`;
+            status.textContent = geo.confirmed ? 'Placement confirmed' : 'Not confirmed yet';
+            status.className = 'geo-status ' + (geo.confirmed ? 'ok' : 'warn');
+        }
+
+        function initMap() {
+            if (geoMap) { geoMap.invalidateSize(); return; }
+            const last = photos.filter((p) => p.gps).pop();
+            const start = geo ? [geo.lat, geo.lng] : last ? [last.gps.lat, last.gps.lon] : [20, 0];
+            geoMap = L.map('map', { worldCopyJump: true }).setView(start, geo || last ? 17 : 2);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(geoMap);
+            L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(geoMap);
+            geoCanvas = document.createElement('canvas');
+            geoCanvas.className = 'plan-overlay-canvas';
+            geoMap.getPane('overlayPane').appendChild(geoCanvas);
+            geoPhotoLayer = L.layerGroup().addTo(geoMap);
+            geoMap.on('move zoom viewreset resize moveend zoomend', drawOverlay);
+            geoMap.on('click', (e) => {
+                if (refPick.step === 'map' && refPick.planPt) { addRef(refPick.planPt, e.latlng); showToast('Point added'); return; }
+                if (!geoPicking) return;
+                geoPicking = false;
+                setGeo({ lat: e.latlng.lat, lng: e.latlng.lng });
+                showToast('Centre set. Now check the scale and rotation.');
+            });
+            geoRefLayer = L.layerGroup().addTo(geoMap);
+            syncGeoInputs();
+            renderGeoPhotos();
+            renderGeoList();
+            renderRefs();
+            drawOverlay();
+        }
+
+        function setView(v) {
+            const onMap = v === 'map';
+            document.body.classList.toggle('map-mode', onMap);
+            document.getElementById('canvas-wrapper').hidden = onMap;
+            document.getElementById('map-view').hidden = !onMap;
+            document.getElementById('view-plan').classList.toggle('active', !onMap);
+            document.getElementById('view-map').classList.toggle('active', onMap);
+            if (onMap) { initMap(); setTimeout(() => geoMap && geoMap.invalidateSize(), 0); }
+        }
+
+        // Geotagged photos: faded until approved; an approved photo is drawn in full with a blue frame.
+        function renderGeoPhotos() {
+            if (!geoMap) return;
+            geoPhotoLayer.clearLayers();
+            photos.filter((p) => p.gps).forEach((p) => {
+                const ok = geoApproved.has(p.id);
+                const m = L.marker([p.gps.lat, p.gps.lon], {
+                    icon: L.divIcon({
+                        className: 'geo-photo' + (ok ? ' approved' : ''),
+                        html: p.thumb ? `<img src="${p.thumb}" alt="">` : escapeHtml(p.name),
+                        iconSize: [56, 42],
+                        iconAnchor: [28, 21]
+                    }),
+                    opacity: ok ? 1 : 0.35,
+                    title: p.name
+                });
+                m.on('click', () => setApproved(p.id, !geoApproved.has(p.id)));
+                m.addTo(geoPhotoLayer);
+            });
+        }
+
+        function setApproved(id, on) {
+            if (on) geoApproved.add(id); else geoApproved.delete(id);
+            renderGeoPhotos();
+            renderGeoList();
+        }
+
+        function renderGeoList() {
+            const list = photos.filter((p) => p.gps);
+            document.getElementById('geo-count').textContent = list.length ? `(${list.length} of ${photos.length})` : '';
+            document.getElementById('geo-list').innerHTML = list.map((p) => {
+                const pt = geo && pdfDoc ? latLngToPlan(p.gps.lat, p.gps.lon) : null;
+                const where = !pt ? 'place the plan first' : insidePlan(pt) ? 'inside the plan' : 'outside the plan (cannot import)';
+                const thumb = p.thumb ? `<img src="${p.thumb}" alt="">` : '';
+                return `<label class="geo-row ${pt && insidePlan(pt) ? '' : 'outside'}">
+                    <input type="checkbox" ${geoApproved.has(p.id) ? 'checked' : ''} onchange="setApproved(${p.id}, this.checked)">
+                    ${thumb}
+                    <span><b>${escapeHtml(p.name)}</b><br><span class="label">${escapeHtml(where)}</span></span>
+                </label>`;
+            }).join('') || '<p class="empty-note">No geotagged photos found. Press Scan after loading photos.</p>';
+            document.getElementById('geo-approve-all').disabled = !list.length;
+        }
+
+        function importApproved() {
+            if (!geo || !geo.confirmed) return showToast('Confirm the plan placement first');
+            let n = 0, outside = 0;
+            photos.forEach((p) => {
+                if (!geoApproved.has(p.id) || !p.gps) return;
+                const pt = latLngToPlan(p.gps.lat, p.gps.lon);
+                if (!insidePlan(pt)) { outside++; return; }
+                p.pos = { x: pt.x, y: pt.y };
+                geoApproved.delete(p.id);
+                n++;
+            });
+            if (!n && !outside) return showToast('Tick the photos to import first');
+            updatePhotoGrid();
+            renderGeoPhotos();
+            renderGeoList();
+            showToast(`Imported ${n} photo${n === 1 ? '' : 's'} onto the plan${outside ? `; ${outside} outside the plan were not imported` : ''}`);
+        }
+
+        // Wiring
+        document.getElementById('geo-method').addEventListener('change', (e) => setMethod(e.target.value));
+        document.getElementById('ref-add').addEventListener('click', () => {
+            if (!pdfDoc) return showToast('Load a plan first');
+            refPick = { step: 'plan', planPt: null };
+            showToast('Click a spot on the plan preview');
+            updateRefButtons();
+        });
+        document.getElementById('ref-cancel').addEventListener('click', () => {
+            refPick = { step: null, planPt: null };
+            renderRefPreview();
+            updateRefButtons();
+        });
+        document.getElementById('geo-plan-pick').addEventListener('click', (e) => {
+            if (refPick.step !== 'plan') return showToast('Press Add point first');
+            const r = e.currentTarget.getBoundingClientRect();
+            refPick = { step: 'map', planPt: { x: (e.clientX - r.left) / r.width * pageW, y: (e.clientY - r.top) / r.height * pageH } };
+            renderRefPreview();
+            updateRefButtons();
+            showToast('Now click the same spot on the map');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && refPick.step) { refPick = { step: null, planPt: null }; renderRefPreview(); updateRefButtons(); }
+        });
+        document.getElementById('view-plan').addEventListener('click', () => setView('plan'));
+        document.getElementById('view-map').addEventListener('click', () => setView('map'));
+        ['geo-ratio', 'geo-rot', 'geo-lat', 'geo-lng'].forEach((id) => document.getElementById(id).addEventListener('change', (e) => {
+            const f = { 'geo-ratio': 'ratio', 'geo-rot': 'rot', 'geo-lat': 'lat', 'geo-lng': 'lng' }[id];
+            const val = parseFloat(e.target.value);
+            if (!isFinite(val)) return;
+            if (f === 'ratio' && val < 1) return;
+            ensureGeo();
+            setGeo({ [f]: val });
+        }));
+        document.getElementById('geo-rot-slider').addEventListener('input', (e) => {
+            ensureGeo();
+            setGeo({ rot: +e.target.value });
+        });
+        document.getElementById('geo-opacity').addEventListener('input', (e) => { ensureGeo(); setGeo({ opacity: +e.target.value }, false); });
+        document.getElementById('geo-show').addEventListener('change', (e) => { ensureGeo(); setGeo({ show: e.target.checked }, false); });
+        document.getElementById('geo-goto').addEventListener('click', () => {
+            if (!geoMap || !geo) return showToast('Place the plan first');
+            geoMap.setView([geo.lat, geo.lng], 17);
+        });
+        document.getElementById('geo-use-view').addEventListener('click', () => {
+            if (!geoMap) return;
+            const c = geoMap.getCenter();
+            ensureGeo();
+            setGeo({ lat: c.lat, lng: c.lng });
+        });
+        document.getElementById('geo-pick').addEventListener('click', () => {
+            geoPicking = !geoPicking;
+            showToast(geoPicking ? 'Click the map where the plan centre should be' : 'Centre picking off');
+            updateGeoReadout();
+        });
+        document.getElementById('geo-confirm').addEventListener('click', () => {
+            if (!geo || !pdfDoc) return showToast('Place the plan first');
+            if (geo.method === 'refs' && (geo.refs || []).length < 2) return showToast('Add at least two points first');
+            geo.confirmed = true;
+            updateGeoReadout();
+            renderGeoList();
+            scheduleAutosave();
+            showToast('Placement confirmed. Tick photos, then Import approved.');
+        });
+        document.getElementById('geo-clear').addEventListener('click', () => {
+            if (!geo) return;
+            if (!confirm('Remove the plan placement on the map? Photos already imported stay where they are.')) return;
+            geo = null;
+            geoApproved.clear();
+            syncGeoInputs();
+            drawOverlay();
+            renderGeoPhotos();
+            renderGeoList();
+            scheduleAutosave();
+        });
+        document.getElementById('geo-scan').addEventListener('click', () => {
+            const n = photos.filter((p) => p.gps).length;
+            renderGeoPhotos();
+            renderGeoList();
+            showToast(`${n} of ${photos.length} photo${photos.length === 1 ? '' : 's'} have a geotag`);
+        });
+        document.getElementById('geo-approve-all').addEventListener('click', () => {
+            photos.filter((p) => p.gps).forEach((p) => geoApproved.add(p.id));
+            renderGeoPhotos();
+            renderGeoList();
+        });
+        document.getElementById('geo-import').addEventListener('click', importApproved);
+
+        // ---------- Reference points: least-squares fit of scale, rotation and centre ----------
+        // Model (plan centred on its middle, y down):  E = A·x + C·y + tE,  N = C·x − A·y + tN  (metres from the first point).
+        // A = k·cos(b), C = −k·sin(b): k = metres per plan point, b = the plan's top bearing.
+        function solveLinear(M, v) {
+            const n = v.length;
+            const A = M.map((row, i) => [...row, v[i]]);
+            const scale = Math.max(...M.flat().map(Math.abs)) || 1;
+            for (let c = 0; c < n; c++) {
+                let piv = c;
+                for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+                if (Math.abs(A[piv][c]) < 1e-12 * scale) return null;
+                [A[c], A[piv]] = [A[piv], A[c]];
+                for (let r = 0; r < n; r++) {
+                    if (r === c) continue;
+                    const f = A[r][c] / A[c][c];
+                    for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k];
+                }
+            }
+            return A.map((row, i) => row[n] / row[i]);
+        }
+        const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+
+        // Fits geo (centre, ratio, rot) to the reference points. Returns true on success.
+        function fitRefs() {
+            const refs = geo.refs || [];
+            refFitError = null;
+            if (refs.length < 2) { refFitError = 'Add at least two points.'; return false; }
+            const lat0 = refs[0].map.lat, lng0 = refs[0].map.lng;
+            const cosLat = Math.cos(lat0 * Math.PI / 180);
+            const cx = pageW / 2, cy = pageH / 2;
+            const M = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+            const v = [0, 0, 0, 0];
+            const addRow = (r, b) => {
+                for (let i = 0; i < 4; i++) { v[i] += r[i] * b; for (let j = 0; j < 4; j++) M[i][j] += r[i] * r[j]; }
+            };
+            refs.forEach(({ plan, map }) => {
+                const x = plan.x - cx, y = plan.y - cy;
+                const E = (map.lng - lng0) * 111320 * cosLat, N = (map.lat - lat0) * 111320;
+                addRow([x, y, 1, 0], E);
+                addRow([-y, x, 0, 1], N);
+            });
+            const u = solveLinear(M, v);
+            if (!u) { refFitError = 'The points are too close together or in a line. Spread them over the plan.'; return false; }
+            const [A, C, tE, tN] = u;
+            const k = Math.hypot(A, C);
+            if (!(k > 0)) { refFitError = 'The points do not give a scale. Check the matches.'; return false; }
+            const b = Math.atan2(-C, A);
+            geo.ratio = k / M_PER_PAPER_PT;
+            geo.rot = normDeg(b * 180 / Math.PI);
+            geo.lat = lat0 + tN / 111320;
+            geo.lng = lng0 + tE / (111320 * cosLat);
+            geo.confirmed = false;
+            return true;
+        }
+
+        // Distance in metres between each reference's map point and where the current placement puts its plan point.
+        function refErrors() {
+            if (!geo || !pdfDoc || (geo.refs || []).length < 2) return [];
+            return geo.refs.map((r) => {
+                const pr = planToLatLng(r.plan.x, r.plan.y);
+                return Math.hypot((r.map.lat - pr.lat) * mPerDegLat, (r.map.lng - pr.lng) * mPerDegLng());
+            });
+        }
+
+        function addRef(planPt, ll) {
+            ensureGeo();
+            geo.method = 'refs';
+            geo.refs = geo.refs || [];
+            geo.refs.push({ plan: { x: planPt.x, y: planPt.y }, map: { lat: ll.lat, lng: ll.lng } });
+            refPick = { step: null, planPt: null };
+            if (geo.refs.length >= 2) fitRefs();
+            afterRefChange();
+        }
+        function removeRef(i) {
+            if (!geo || !geo.refs) return;
+            geo.refs.splice(i, 1);
+            if (geo.refs.length >= 2) fitRefs(); else { refFitError = 'Add at least two points.'; geo.confirmed = false; }
+            afterRefChange();
+        }
+        function afterRefChange() {
+            syncGeoInputs();
+            renderRefs();
+            renderRefPreview();
+            drawOverlay();
+            renderGeoList();
+            updateRefButtons();
+            scheduleAutosave();
+        }
+
+        function renderRefs() {
+            const refs = geo && geo.refs ? geo.refs : [];
+            const errs = refErrors();
+            document.getElementById('geo-ref-list').innerHTML = refs.map((r, i) => `
+                <div class="geo-ref-row">
+                    <span class="geo-ref-text"><b>${i + 1}</b> plan ${r.plan.x.toFixed(0)}, ${r.plan.y.toFixed(0)}<br>
+                    <span class="label">map ${r.map.lat.toFixed(6)}, ${r.map.lng.toFixed(6)}${errs.length ? ` · error ${errs[i].toFixed(2)} m` : ''}</span></span>
+                    <button class="btn btn-sm btn-danger" onclick="removeRef(${i})">Remove</button>
+                </div>`).join('') || '<p class="empty-note">No points yet.</p>';
+            const fit = document.getElementById('geo-fit');
+            if (!pdfDoc) fit.textContent = 'Load a plan first.';
+            else if (refFitError) { fit.className = 'geo-fit warn'; fit.textContent = refFitError; }
+            else if (refs.length < 2) { fit.className = 'geo-fit'; fit.textContent = 'Add at least two points to fit the placement.'; }
+            else {
+                const mean = errs.reduce((a, e) => a + e, 0) / errs.length, max = Math.max(...errs);
+                const planM = Math.max(pageW, pageH) * metresPerPt();
+                const warn = max > planM * 0.01;
+                fit.className = 'geo-fit' + (warn ? ' warn' : '');
+                fit.textContent = `Fitted from ${refs.length} points: scale 1:${Math.round(geo.ratio)}, rotation ${geo.rot.toFixed(1)}° clockwise from north. Mean error ${mean.toFixed(2)} m, largest ${max.toFixed(2)} m.`
+                    + (warn ? ' The largest error is over 1% of the plan: check that point, or remove it.' : '');
+            }
+            renderRefMarkers();
+        }
+        function renderRefMarkers() {
+            if (!geoMap || !geoRefLayer) return;
+            geoRefLayer.clearLayers();
+            ((geo && geo.refs) || []).forEach((r, i) => {
+                L.marker([r.map.lat, r.map.lng], {
+                    icon: L.divIcon({ className: 'geo-ref-pt-wrap', html: `<div class="geo-ref-pt">${i + 1}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
+                    interactive: false
+                }).addTo(geoRefLayer);
+            });
+        }
+
+        // The plan as a small picker: a click gives the plan coordinate of a reference point.
+        function renderRefPreview() {
+            const c = document.getElementById('geo-plan-pick');
+            if (!c || !pdfDoc) return;
+            if (!overlayImg) { ensureOverlayImage().then(renderRefPreview); return; }
+            c.width = 560;
+            c.height = Math.round(560 * pageH / pageW);
+            c.style.height = 'auto';
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0, 0, c.width, c.height);
+            ctx.drawImage(overlayImg, 0, 0, c.width, c.height);
+            const at = (pt) => ({ x: pt.x / pageW * c.width, y: pt.y / pageH * c.height });
+            ((geo && geo.refs) || []).forEach((r, i) => drawPickDot(ctx, at(r.plan), String(i + 1), '#B08C55'));
+            if (refPick.planPt) drawPickDot(ctx, at(refPick.planPt), '?', '#B76556');
+        }
+        function drawPickDot(ctx, pt, label, color) {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 11, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#242421';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#FAF8F2';
+            ctx.font = '600 12px "IBM Plex Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, pt.x, pt.y + 0.5);
+        }
+        function updateRefButtons() {
+            const add = document.getElementById('ref-add');
+            add.textContent = refPick.step === 'plan' ? 'Click the plan…' : refPick.step === 'map' ? 'Click the map…' : 'Add point';
+            document.getElementById('ref-cancel').disabled = !refPick.step;
+            if (!geoMap && !refPick.step) return;
+        }
+        function setMethod(m) {
+            ensureGeo();
+            geo.method = m;
+            if (m === 'refs' && (geo.refs || []).length >= 2) fitRefs();
+            afterRefChange();
+        }
+
         // ---------- Regions ----------
         function pointInPolygon(x, y, pts) {
             let inside = false;
@@ -1022,10 +2014,14 @@
             return pointInPolygon(x, y, region.points);
         }
 
-        function regionOf(photo) {
+        // Base layer (Areas) decides photo names and locations. Other layers only change what the plan draws and filters.
+        function regionIn(photo, list) {
             if (!photo.pos) return null;
-            const hits = regions.filter((r) => regionContains(r, photo.pos.x, photo.pos.y));
+            const hits = list.filter((r) => regionContains(r, photo.pos.x, photo.pos.y));
             return hits.length ? hits[hits.length - 1] : null;
+        }
+        function regionOf(photo) {
+            return regionIn(photo, schemes[0].regions);
         }
 
         function openLabelModal() {
@@ -1061,6 +2057,7 @@
         });
 
         function updateRegionsList() {
+            renderSchemes();
             document.getElementById('regions-list').innerHTML = regions.map((r) => `
                 <div class="region-item">
                     <span class="region-label">${escapeHtml(r.label)}</span>
@@ -1085,7 +2082,8 @@
         }
 
         function deleteRegion(id) {
-            regions = regions.filter((r) => r.id !== id);
+            const i = regions.findIndex((r) => r.id === id);
+            if (i >= 0) regions.splice(i, 1);
             selectedRegionFilters.delete(id);
             updateRegionsList();
             redrawAnnotations();
@@ -1242,6 +2240,7 @@
                     gps: exif.gps,
                     camera: exif.camera,
                     pos: null,
+                    tags: [],
                     key: null,
                     missing: false
                 }
@@ -1287,15 +2286,16 @@
 
         function isShown(p) {
             if (!selectedRegionFilters.size) return true;
-            const r = regionOf(p);
+            const r = regionIn(p, regions);
             return !!r && selectedRegionFilters.has(r.id);
         }
 
         // ---------- Photos: sidebar ----------
         function updatePhotoGrid() {
             photos.sort((a, b) => a.timestamp - b.timestamp);
+            const geotagged = photos.filter((p) => p.gps).length;
             document.getElementById('photo-count').textContent = photos.length
-                ? `(${photos.filter((p) => p.pos).length} placed / ${photos.length})` : '';
+                ? `(${photos.filter((p) => p.pos).length} placed / ${photos.length}${geotagged ? `, ${geotagged} geotagged` : ''})` : '';
 
             const shown = photos.filter(isShown);
             const grid = document.getElementById('photo-grid');
@@ -1314,14 +2314,21 @@
                         : `<div class="photo-fallback"><div>${escapeHtml(p.name)}${p.missing ? '<br><b>file missing</b>' : ''}</div></div>`;
                     const d = new Date(p.timestamp);
                     const when = `${d.toLocaleDateString([], { dateStyle: 'medium' })}<br>${d.toLocaleTimeString([], { timeStyle: 'short' })}${p.timeFromExif ? '' : ' <span class="guess" title="No EXIF time; using file date">(file date)</span>'}${p.gps ? ' <svg class="icon icon-sm" role="img" aria-label="Has GPS"><title>Has GPS location</title><use href="#i-map-pin"/></svg>' : ''}`;
+                    const chips = tagsFor(p).map((t) => `<span class="photo-tag tag" style="--tag:${t.color}"><i class="tag-dot" style="background:${t.color}"></i>${escapeHtml(t.name)}</span>`).join('');
                     return `
-                        <div class="photo-card ${p.pos ? 'placed' : ''}" draggable="true" data-id="${p.id}">
+                        <div class="photo-card ${p.pos ? 'placed' : ''} ${p.id === selectedPhotoId ? 'selected' : ''}" draggable="true" data-id="${p.id}">
                             <div class="photo-thumbnail">${body}</div>
                             <div class="photo-info">${when}</div>
-                            ${keyTag}${tag}
+                            ${keyTag}${tag}${chips}
                         </div>`;
                 }).join('');
             }
+            renderSchemes();
+            renderVisibility();
+            if (geoMap) { renderGeoPhotos(); renderGeoList(); }
+            renderTags();
+            renderTabs();
+            renderInspector();
             renderMarkers();
             document.getElementById('link-btn').style.display = photos.some((p) => p.missing) ? '' : 'none';
             updatePhotosButton();
@@ -1342,6 +2349,7 @@
             const card = e.target.closest('.photo-card');
             if (!card) return;
             const p = photos.find((p) => p.id === +card.dataset.id);
+            if (p) selectPhoto(p.id);
             if (p && p.pos) {
                 wrapper.scrollLeft = p.pos.x * zoomLevel - wrapper.clientWidth / 2;
                 wrapper.scrollTop = p.pos.y * zoomLevel - wrapper.clientHeight / 2;
@@ -1423,17 +2431,20 @@
 
         function renderMarkers() {
             markerLayer.innerHTML = '';
-            photos.filter((p) => p.pos && isShown(p)).forEach((p) => {
+            photos.filter((p) => p.pos && isShown(p) && tabOK(p) && visOK(p)).forEach((p) => {
                 const el = document.createElement('div');
                 el.dataset.id = p.id;
+                const selCls = p.id === selectedPhotoId ? ' selected' : '';
                 if (p.key) {
-                    el.className = 'photo-marker key-marker';
+                    el.className = 'photo-marker key-marker' + selCls;
                     el.title = `${p.key} · ${p.name}`;
                     el.innerHTML = `<span>${p.key}</span>`;
                 } else {
-                    el.className = 'photo-marker';
+                    el.className = 'photo-marker' + selCls;
                     el.innerHTML = p.thumb ? `<img src="${p.thumb}" alt="">` : `<div class="photo-fallback">${escapeHtml(p.name)}</div>`;
                 }
+                const first = tagsFor(p)[0];
+                if (first) el.style.outline = `3px solid ${first.color}`;
                 placeMarkerEl(el, p);
                 markerLayer.appendChild(el);
             });
@@ -1445,6 +2456,7 @@
             if (!el || e.button !== 0) return;
             const p = photos.find((p) => p.id === +el.dataset.id);
             const start = toPlan(e);
+            selectPhoto(p.id);
             markerDrag = { el, p, dx: p.pos.x - start.x, dy: p.pos.y - start.y, moved: false };
             el.setPointerCapture(e.pointerId);
             hidePopup();
@@ -1645,7 +2657,7 @@
                     const cw = font.widthOfTextAtSize(cap, cs);
                     addPhotoStamp(doc, page, {
                         img, x, y, w, h, cap, cs, cw, font, lw,
-                        frame: frameRgb, plate: plateRgb, ink: frameRgb,
+                        frame: tagRgbArr(p, frameRgb), plate: plateRgb, ink: frameRgb,
                         title: 'Map Photos',
                         contents: `${keyPart}${r ? r.label + ' | ' : ''}${time} | ${p.name}`,
                         name: `mapphotos-${timeStamp()}-${i + 1}`
@@ -1712,10 +2724,11 @@
 
         function manifestCsv(plan) {
             const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-            const rows = [['new_name', 'original_name', 'original_path', 'key', 'region', 'taken_at', 'taken_at_source', 'import_batch', 'gps_lat', 'gps_lon', 'plan_x', 'plan_y']];
+            const rows = [['new_name', 'original_name', 'original_path', 'key', 'region', 'taken_at', 'taken_at_source', 'import_batch', 'gps_lat', 'gps_lon', 'plan_x', 'plan_y', 'tags']];
             plan.forEach(({ photo: p, region, name }) => rows.push([
                 name, p.name, p.path, p.key || '', region ? region.label : '', iso(p.timestamp), p.timeFromExif ? 'exif' : 'file_date', p.batch,
-                p.gps ? p.gps.lat : '', p.gps ? p.gps.lon : '', Math.round(p.pos.x * 100) / 100, Math.round(p.pos.y * 100) / 100
+                p.gps ? p.gps.lat : '', p.gps ? p.gps.lon : '', Math.round(p.pos.x * 100) / 100, Math.round(p.pos.y * 100) / 100,
+                tagsFor(p).map((t) => t.name).join('; ')
             ]));
             return rows.map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';
         }
@@ -1843,6 +2856,15 @@
                 },
                 settings: { photo_size_percent_of_page_width: photoSizePct },
                 regions: regions.map(regionJson),
+                active_scheme: activeSchemeId,
+                schemes: schemes.map((s) => ({ id: s.id, name: s.name, regions: s.regions.map(regionJson) })),
+                tags: tags.map((t) => ({ id: t.id, name: t.name, color: t.color, tab: !!t.tab })),
+                visibility: { mode: visMode, untagged: showUntagged, hidden_tags: [...hiddenTags] },
+                geo: geo ? {
+                    lat: round(geo.lat * 1e6) / 1e6, lng: round(geo.lng * 1e6) / 1e6, ratio: geo.ratio, rot: round(geo.rot * 100) / 100,
+                    opacity: geo.opacity, show: !!geo.show, confirmed: !!geo.confirmed, method: geo.method || 'centre',
+                    refs: (geo.refs || []).map((r) => ({ plan: { x: round(r.plan.x), y: round(r.plan.y) }, map: { lat: round(r.map.lat * 1e7) / 1e7, lng: round(r.map.lng * 1e7) / 1e7 } }))
+                } : null,
                 annotations: annotations.map((a) => (a.type === 'note'
                     ? { id: a.id, type: 'note', x: round(a.x), y: round(a.y), text: a.text }
                     : a.type === 'arrow'
@@ -1869,7 +2891,8 @@
                         position: p.pos ? { x: round(p.pos.x), y: round(p.pos.y) } : null,
                         key: p.key || null,
                         region: r ? r.label : null,
-                        region_id: r ? r.id : null
+                        region_id: r ? r.id : null,
+                        tags: (p.tags || []).slice()
                     };
                 })
             };
@@ -1885,10 +2908,31 @@
             photos.forEach((p) => { if (p.thumb) URL.revokeObjectURL(p.thumb); if (p.preview) URL.revokeObjectURL(p.preview); });
             await openPdfBytes(planBytes, json.name || String(json.plan.file_name).replace(/\.pdf$/i, ''));
             planInfo = planFile;
-            regions = (json.regions || []).map((r) => (r.type === 'box'
+            const readRegion = (r) => (r.type === 'box'
                 ? { id: r.id, label: r.label, type: 'box', x: r.x, y: r.y, width: r.width, height: r.height }
-                : { id: r.id, label: r.label, type: 'polyline', closed: r.closed !== false, points: (r.points || []).map((pt) => ({ x: pt.x, y: pt.y })) }));
-            nextRegionId = regions.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+                : { id: r.id, label: r.label, type: 'polyline', closed: r.closed !== false, points: (r.points || []).map((pt) => ({ x: pt.x, y: pt.y })) });
+            // older files have no schemes: their regions become one scheme
+            const jsonSchemes = Array.isArray(json.schemes) && json.schemes.length ? json.schemes : [{ id: 1, name: 'Areas', regions: json.regions || [] }];
+            const srcIds = jsonSchemes.map((s) => s.id);
+            schemes = jsonSchemes.map((s, i) => ({ id: i + 1, name: String(s.name || `Scheme ${i + 1}`), regions: (s.regions || []).map(readRegion) }));
+            const pick = schemes[Math.max(0, srcIds.indexOf(json.active_scheme))];
+            activeSchemeId = pick.id;
+            regions = pick.regions;
+            nextSchemeId = schemes.length + 1;
+            nextRegionId = schemes.reduce((m, s) => s.regions.reduce((mm, r) => Math.max(mm, r.id), m), 0) + 1;
+            tags = (json.tags || []).filter((t) => Number.isInteger(t.id) && t.name).map((t, i) => ({
+                id: t.id, name: String(t.name), color: /^#[0-9a-f]{6}$/i.test(t.color || '') ? t.color : TAG_COLORS[i % TAG_COLORS.length], tab: !!t.tab
+            }));
+            nextTagId = tags.reduce((m, t) => Math.max(m, t.id), 0) + 1;
+            geo = json.geo ? { ...json.geo, method: json.geo.method === 'refs' ? 'refs' : 'centre', refs: json.geo.refs || [] } : null;
+            refPick = { step: null, planPt: null };
+            geoApproved.clear();
+            geoPicking = false;
+            visMode = json.visibility && json.visibility.mode === 'and' ? 'and' : 'or';
+            showUntagged = !json.visibility || json.visibility.untagged !== false;
+            hiddenTags = new Set((json.visibility && json.visibility.hidden_tags || []).filter((id) => tags.some((t) => t.id === id)));
+            activeTab = null;
+            selectedPhotoId = null;
             annotations = (json.annotations || []).filter((a) => ['note', 'arrow', 'cloud'].includes(a.type)).map((a, i) => ({ ...a, id: Number.isInteger(a.id) ? a.id : i + 1 }));
             nextAnnotId = annotations.reduce((m, a) => Math.max(m, a.id), 0) + 1;
             currentAnn = null;
@@ -1931,6 +2975,7 @@
                     gps: jp.gps !== undefined ? jp.gps : (loaded ? loaded.gps : null),
                     camera: jp.camera !== undefined ? jp.camera : (loaded ? loaded.camera : null),
                     pos: jp.position ? { x: jp.position.x, y: jp.position.y } : null,
+                    tags: (jp.tags || []).filter((id) => tags.some((t) => t.id === id)),
                     key: Number.isInteger(jp.key) && jp.key > 0 ? jp.key : null,
                     missing: !image
                 });
@@ -1940,6 +2985,10 @@
             photos.forEach((p) => { if (p.pos && !p.key) p.key = nextKeyNo++; });  // older files: number placed photos in time order
             updateRegionsList();
             redrawAnnotations();
+            syncGeoInputs();
+            renderRefs();
+            renderRefPreview();
+            drawOverlay();
             unsavedChanges = false;
             lastSave = null;
             renderSaveStatus();

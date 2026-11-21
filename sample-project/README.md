@@ -30,6 +30,36 @@ The three tools are in the left rail under the region tools. Click the tool, the
 9. **Revision cloud** (cloud icon): drag a rectangle around the area that changed.
 10. Everything you add is listed under **Markup** in the right panel. Use **Edit** to change a note, **Delete** to remove an item, or **Clear all markup**.
 
+## Tags, tabs and the pointer
+
+Tags are labels for photos, separate from regions. The sample has three: Ticketing, Stage view and Seating. Each tag with **Tab** ticked appears as a coloured tab above the plan.
+
+- New tags are not tabs. Make one with **+ Tab** above the plan: pick a tag from the list, or type a new name (it creates the tag).
+- Double-click a tab, or use **Rename** in the Tags panel, to rename a tag. Renaming a layer's tag renames the layer too.
+- Click a tab to show only that tag's photos on the plan. **All photos** shows everything.
+- Drag a photo card onto a tab to tag it. Dropped while you are viewing a different tab, it moves: it comes off the tab you were viewing.
+- Choose the **pointer** tool (arrow icon in the left rail), then click a photo on the plan to select it. Drag it to move it. The **Selected photo** panel on the right lists every tag with a tick box, and a **Move / Add** control.
+- Add your own tags in the **Tags** panel. Pick a colour with the swatch. Untick **Tab** to keep a tag off the tab bar.
+
+## Layers
+
+Areas is the base layer. Its region names make the photo file names (for example `Stage_01.jpg`), and it cannot be renamed or deleted. The **Layers** panel can show another layer on the plan. Make one with **New layer**: its name becomes a tag (for example Trades). Other layers do not change file names.
+
+## Visibility on the base layer
+
+With the **Areas** layer active, the **Visibility** panel lists every tag. Untick a tag to hide its photos on the plan. **Any ticked tag (OR)** shows a photo if any of its tags is ticked; **All its tags ticked (AND)** shows it only if all of its tags are ticked. Untagged photos have their own tick.
+
+## Map view
+
+Click **Map** at the top left. The map uses OpenStreetMap tiles (internet needed for the map only; your plan and photos stay on this device).
+
+1. Set the **drawing scale** (1:N, from the plan's title block), the **rotation** (degrees clockwise from north for the top of the plan) and the **centre** (type the coordinates, or click the map after pressing *Click map to set centre*).
+   Or choose **Reference points** as the placement method: add two or more pairs, each a distinctive spot on the plan preview (a gate, a corner) followed by the same spot on the map. Scale, rotation and centre are fitted from the pairs, and each pair's error is shown in metres. Zoom the map in before clicking the map point. Remove any pair with a large error.
+2. Check the plan on the map: the red frame is the plan and its top edge is marked. Use the opacity slider to compare. Confirm only when the size and direction look right.
+3. Photos with a GPS tag appear on the map faded. Tick the ones that belong on this plan, then press **Import approved**. They go onto the Plan view at their map positions. Photos outside the plan are not imported.
+
+The sample plan is a satellite image without a real drawing scale, so set the scale yourself before using the map with it.
+
 ## Draw your own region
 
 11. Pick the **polyline** tool (click points, double-click to close) or the **box** tool (drag), then name the region.

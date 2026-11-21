@@ -161,7 +161,10 @@
       "camera": null,
       "aspect_ratio": 1.55,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        1
+      ]
     },
     {
       "id": 2,
@@ -178,7 +181,10 @@
       "camera": null,
       "aspect_ratio": 1.68,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        1
+      ]
     },
     {
       "id": 3,
@@ -195,7 +201,10 @@
       "camera": null,
       "aspect_ratio": 1.59,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        1
+      ]
     },
     {
       "id": 4,
@@ -212,7 +221,10 @@
       "camera": null,
       "aspect_ratio": 1.09,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        2
+      ]
     },
     {
       "id": 5,
@@ -229,7 +241,10 @@
       "camera": null,
       "aspect_ratio": 0.95,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        2
+      ]
     },
     {
       "id": 6,
@@ -246,7 +261,10 @@
       "camera": null,
       "aspect_ratio": 1.44,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        2
+      ]
     },
     {
       "id": 7,
@@ -263,7 +281,10 @@
       "camera": null,
       "aspect_ratio": 1.43,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        3
+      ]
     },
     {
       "id": 8,
@@ -280,7 +301,10 @@
       "camera": null,
       "aspect_ratio": 1.73,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        3
+      ]
     },
     {
       "id": 9,
@@ -297,7 +321,30 @@
       "camera": null,
       "aspect_ratio": 1.28,
       "placed": false,
-      "position": null
+      "position": null,
+      "tags": [
+        3
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "id": 1,
+      "name": "Ticketing",
+      "color": "#B76556",
+      "tab": true
+    },
+    {
+      "id": 2,
+      "name": "Stage view",
+      "color": "#607D91",
+      "tab": true
+    },
+    {
+      "id": 3,
+      "name": "Seating",
+      "color": "#6E8B5E",
+      "tab": true
     }
   ]
 }
